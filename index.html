@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMPLE CITY — Karten- &amp; Geländeexport · v13</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#f3f2ee;
+    --panel:#ffffff;
+    --panel-2:#eeece7;
+    --line:#d6d2ca;
+    --ink:#111111;
+    --ink-dim:#66635d;
+    --ink-faint:#9a968e;
+    --amber:#0000ff;
+    --amber-dim:#0000cc;
+    --cyan:#0000ff;
+    --green:#5b7f57;
+    --red:#a95b4d;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+    --sans:'Inter', system-ui, sans-serif;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  body{display:flex;flex-direction:column;overflow:hidden;}
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 18px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;}
+  .brand .mark{width:9px;height:9px;background:var(--amber);display:inline-block;transform:rotate(45deg);}
+  .brand h1{font-size:15px;letter-spacing:.14em;font-weight:700;margin:0;font-family:var(--mono);}
+  .brand small{color:var(--ink-faint);font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;}
+  .coord-readout{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);display:flex;gap:16px;}
+  .coord-readout span b{color:var(--ink);font-weight:600;}
+  .wrap{flex:1 1 auto;display:flex;min-height:0;}
+  aside{width:308px;flex:0 0 308px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:0 0 24px 0;}
+  main{flex:1 1 auto;position:relative;min-width:0;background:#e9e7e1;}
+  aside::-webkit-scrollbar{width:8px;}
+  aside::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+  .field-search{padding:14px 16px;border-bottom:1px solid var(--line);}
+  .field-search input{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:8px 10px;border-radius:var(--radius);font-family:var(--sans);font-size:12.5px;outline:none;}
+  .field-search input:focus{border-color:var(--amber-dim);}
+  .field-search .hint{font-size:10px;color:var(--ink-faint);margin-top:5px;font-family:var(--mono);}
+  .row3{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);}
+  .row3 .full{grid-column:1/-1;}
+  .num-field label{display:block;font-size:9.5px;letter-spacing:.09em;color:var(--ink-faint);margin-bottom:4px;font-family:var(--mono);text-transform:uppercase;}
+  .num-field input{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:6px 8px;border-radius:var(--radius);font-family:var(--mono);font-size:12px;outline:none;}
+  .num-field input:focus{border-color:var(--amber-dim);}
+  section.panel{border-bottom:1px solid var(--line);}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 8px 16px;cursor:pointer;user-select:none;}
+  .panel-head h2{font-size:10.5px;letter-spacing:.14em;font-family:var(--mono);font-weight:700;color:var(--ink-dim);margin:0;}
+  .panel-head .chev{color:var(--ink-faint);font-size:10px;transition:transform .15s;}
+  .panel-head.collapsed .chev{transform:rotate(-90deg);}
+  .panel-body{padding:2px 16px 12px 16px;display:flex;flex-direction:column;gap:2px;}
+  .panel-body.hidden{display:none;}
+  .chk{display:flex;align-items:center;gap:9px;padding:4px 0;cursor:pointer;}
+  .chk input{accent-color:var(--amber);width:13px;height:13px;cursor:pointer;}
+  .chk span{font-size:12.5px;color:var(--ink);}
+  .chk .swatch{width:8px;height:8px;border-radius:2px;flex:0 0 auto;margin-left:auto;}
+  .subfield{display:flex;align-items:center;justify-content:space-between;padding:5px 0 5px 22px;gap:8px;}
+  .subfield label{font-size:11px;color:var(--ink-dim);font-family:var(--mono);flex:0 0 auto;}
+  .subfield input[type=number], .subfield input[type=range]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:11.5px;border-radius:var(--radius);}
+  .subfield input[type=number]{width:56px;padding:4px 6px;}
+  .subfield input[type=range]{width:100px;accent-color:var(--amber);}
+  .subfield input[type=color]{width:34px;height:22px;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-2);cursor:pointer;}
+  .subfield select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:11px;padding:4px 6px;border-radius:var(--radius);}
+  .style-group-label{padding:8px 0 2px 0;font-size:9.5px;letter-spacing:.1em;color:var(--amber-dim);font-family:var(--mono);border-top:1px solid var(--line);margin-top:4px;}
+  .style-group-label:first-child{border-top:none;margin-top:0;}
+  .radio-group{display:flex;flex-direction:column;gap:2px;padding-left:22px;}
+  .radio-row{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;}
+  .radio-row input{accent-color:var(--amber);cursor:pointer;}
+  .radio-row span{font-size:11.5px;color:var(--ink-dim);font-family:var(--mono);}
+  .seg{display:flex;padding-left:22px;gap:0;margin:4px 0 6px 0;}
+  .seg button{flex:1;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);font-family:var(--mono);font-size:10.5px;padding:5px 4px;cursor:pointer;}
+  .seg button:first-child{border-radius:var(--radius) 0 0 var(--radius);}
+  .seg button:last-child{border-radius:0 var(--radius) var(--radius) 0;border-left:none;}
+  .seg button.active{background:var(--amber-dim);color:#fff;border-color:var(--amber-dim);}
+  .generate-block{padding:16px;display:flex;flex-direction:column;gap:8px;}
+  #genBtn{background:var(--amber);color:#ffffff;border:none;border-radius:var(--radius);padding:11px 12px;font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.06em;cursor:pointer;text-transform:uppercase;}
+  #genBtn:disabled{background:var(--ink-faint);cursor:progress;color:#ffffff;}
+  #genBtn:hover:not(:disabled){background:#0000cc;}
+  .status-line{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);min-height:14px;}
+  .status-line.err{color:var(--red);}
+  .status-line.ok{color:var(--green);}
+  .export-block{padding:14px 16px 4px 16px;}
+  .export-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;}
+  .export-grid button{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:10.5px;padding:9px 3px;border-radius:var(--radius);cursor:pointer;letter-spacing:.04em;}
+  .export-grid button:hover{border-color:var(--amber-dim);color:var(--amber);}
+  .export-grid button:disabled{opacity:.35;cursor:not-allowed;}
+  .view-tabs{position:absolute;top:12px;left:12px;z-index:500;display:flex;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .view-tabs button{background:transparent;border:none;color:var(--ink-dim);font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:8px 14px;cursor:pointer;text-transform:uppercase;}
+  .view-tabs button.active{background:var(--panel-2);color:var(--amber);}
+  #mapview, #view3d, #svgview{position:absolute;inset:0;}
+  #view3d{display:none;background:#e9e7e1;}
+  #view3d canvas{display:block;}
+  #svgview{display:none;background:var(--bg);align-items:center;justify-content:center;overflow:hidden;cursor:grab;user-select:none;}
+  #svgview.dragging{cursor:grabbing;}
+  #svgview img{position:absolute;top:50%;left:50%;box-shadow:0 0 0 1px var(--line);transform-origin:0 0;will-change:transform;}
+  .viewport-hint{position:absolute;bottom:14px;left:14px;z-index:400;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);background:rgba(10,12,15,.7);padding:6px 10px;border-radius:var(--radius);border:1px solid var(--line);pointer-events:none;}
+  .view-export{display:flex;gap:5px;margin-left:8px;}
+.view-export button{padding:6px 9px;font:10px var(--mono);border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-2);color:var(--ink);cursor:pointer;}
+.view-export button:disabled{opacity:.45;cursor:default;}
+.view3d-toolbar{position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;min-width:150px;}
+  .view3d-toolbar .chk span{font-size:11px;}
+  .view3d-toolbar .seg{padding-left:0;}
+  .empty-3d{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--ink-faint);font-family:var(--mono);font-size:12px;text-align:center;}
+  .lyr-row{display:flex;align-items:center;gap:8px;}
+  .lyr-row .chk{flex:1 1 auto;min-width:0;}
+  .lyr-row .chk span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;}
+  .lyr-row input[type=color]{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-2);cursor:pointer;flex:0 0 auto;}
+  .lyr-row input[type=range]{width:62px;accent-color:var(--amber);flex:0 0 auto;}
+  .list-col{display:flex;flex-direction:column;gap:0;}
+  .hint-mono{font-size:9.5px;color:var(--ink-faint);font-family:var(--mono);padding:0 0 6px 0;line-height:1.45;}
+  ::selection{background:var(--amber-dim);color:#fff;}
+  a{color:var(--cyan);}
+  .leaflet-container{background:var(--bg);}
+
+/* ============================= MAP LOOK EDITOR ============================= */
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark"></span>
+    <h1>SIMPLE CITY</h1>
+    <small>KARTEN- &amp; GELÄNDEEXPORT</small>
+  </div>
+  <div class="coord-readout">
+    <span>LAT <b id="hdrLat">—</b></span>
+    <span>LON <b id="hdrLon">—</b></span>
+    <span>RADIUS <b id="hdrRad">—</b> m</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside id="sidebar">
+
+    <div class="field-search">
+      <input type="text" id="searchInput" placeholder="Ort suchen (z. B. Sundern, DE)…" autocomplete="off">
+      <div class="hint">OPEN MAP LOCATION — Adresse oder Koordinaten</div>
+    </div>
+
+    <div class="row3">
+      <div class="num-field"><label>Latitude</label><input type="number" id="latInput" step="0.00001"></div>
+      <div class="num-field"><label>Longitude</label><input type="number" id="lonInput" step="0.00001"></div>
+      <div class="num-field full"><label>Radius (m)</label><input type="number" id="radInput" step="10" min="50" max="4000"></div>
+    </div>
+
+    <!-- MAP -->
+    <section class="panel" data-panel="map">
+      <div class="panel-head"><h2>Karte</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <label class="chk"><input type="checkbox" id="lyr_streets" checked><span>Streets</span><span class="swatch" style="background:#cfcfcf"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_buildings" checked><span>Gebäude</span><span class="swatch" style="background:#8a8478"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_water" checked><span>Wasser</span><span class="swatch" style="background:#5ec8d8"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_parks" checked><span>Parks</span><span class="swatch" style="background:#5f9e6a"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_forests" checked><span>Wälder</span><span class="swatch" style="background:#426b42"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_meadows" checked><span>Wiesen / Gras</span><span class="swatch" style="background:#8da56a"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_farmland" checked><span>Landwirtschaft</span><span class="swatch" style="background:#b0a06a"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_scrub" checked><span>Gestrüpp</span><span class="swatch" style="background:#7f9662"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_wetlands" checked><span>Feuchtgebiete</span><span class="swatch" style="background:#6e9188"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_railway"><span>Bahn</span><span class="swatch" style="background:#c96a4e"></span></label>
+        <label class="chk"><input type="checkbox" id="lyr_borders"><span>Grenzen</span><span class="swatch" style="background:#d6a531"></span></label>
+        <div class="subfield" style="padding-left:0"><label>Genauigkeit</label>
+          <input type="range" id="precisionSlider" min="0" max="12" step="0.5" value="0">
+        </div>
+        <div style="font-size:9.5px;color:var(--ink-faint);font-family:var(--mono);padding-left:0;">0 = volle Detailtreue · höher = vereinfachte Kurven</div>
+      </div>
+    </section>
+
+    <!-- WEITERE GRÜNFLÄCHEN -->
+    <section class="panel" data-panel="greenextra">
+      <div class="panel-head"><h2>Weitere Grünflächen</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div class="hint-mono">Zusätzlich zu Parks / Forests / Meadows oben · je Zeile: an/aus · Farbe · Deckkraft</div>
+        <div id="extraGreenList" class="list-col"></div>
+      </div>
+    </section>
+
+    <!-- GRUNDSTÜCKE -->
+    <section class="panel" data-panel="parcels">
+      <div class="panel-head"><h2>Grundstücke</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <label class="chk"><input type="checkbox" id="prc_enable"><span>Flurstücke / Grundstücksgrenzen</span></label>
+        <div class="subfield"><label>Quelle</label>
+          <select id="prc_source">
+            <option value="alkis" selected>ALKIS NRW (amtlich)</option>
+            <option value="osm">OpenStreetMap</option>
+          </select>
+        </div>
+        <label class="chk" style="padding-left:22px"><input type="checkbox" id="prc_labels"><span style="font-size:11.5px">Flurstücksnummern (ALKIS)</span></label>
+        <div class="subfield"><label>Umriss</label><input type="color" id="s_prc_color" value="#b0603f"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_prc_width" value="0.5" step="0.1" min="0.1"></div>
+        <div class="subfield"><label>Linie</label><select id="s_prc_dash"><option value="solid" selected>Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+        <div class="subfield"><label>Füllung</label><input type="color" id="s_prc_fill" value="#d6a531"></div>
+        <div class="subfield"><label>Füll-Deckkraft</label><input type="range" id="s_prc_fillop" min="0" max="1" step="0.05" value="0"></div>
+        <label class="chk"><input type="checkbox" id="prc_fences"><span>Zäune / Mauern (OSM)</span><span class="swatch" style="background:#8a7f6a"></span></label>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_fence_color" value="#8a7f6a"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_fence_width" value="0.4" step="0.1" min="0.1"></div>
+        <div class="hint-mono" style="padding-top:6px">ALKIS: amtliche Flurstücke von Geobasis NRW (nur Nordrhein-Westfalen, ohne Eigentümer). Außerhalb NRW: Quelle „OpenStreetMap“ (dort nur teilweise erfasst).</div>
+      </div>
+    </section>
+
+    <!-- BODENFLÄCHEN -->
+    <section class="panel" data-panel="groundextra">
+      <div class="panel-head"><h2>Bodenflächen</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div class="hint-mono">Flächen auf dem Boden (unter Grün, Wasser &amp; Gebäuden) · je Zeile: an/aus · Farbe · Deckkraft</div>
+        <div id="extraGroundList" class="list-col"></div>
+      </div>
+    </section>
+
+    <!-- LABELS -->
+    <section class="panel" data-panel="labels">
+      <div class="panel-head"><h2>Beschriftungen</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <label class="chk"><input type="checkbox" id="lbl_cities"><span>Cities</span></label>
+        <label class="chk"><input type="checkbox" id="lbl_streets"><span>Street names</span></label>
+        <label class="chk"><input type="checkbox" id="lbl_water"><span>Water names</span></label>
+        <label class="chk"><input type="checkbox" id="lbl_poi"><span>POIs</span></label>
+      </div>
+    </section>
+
+    <!-- 3D-DETAILS -->
+    <section class="panel" data-panel="details3d">
+      <div class="panel-head"><h2>3D-Details &amp; Bauwerke</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div class="hint-mono">Zusätzliche 3D-Geometrie aus OpenStreetMap. Nur Objekte, die in OSM tatsächlich erfasst sind, können dargestellt werden.</div>
+        <label class="chk"><input type="checkbox" id="d3d_bridges"><span>Brücken</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_bridgeSupports"><span>Brückenpfeiler / Stützen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_tunnels"><span>Tunnel / Unterführungen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_roads"><span>Straßen als 3D-Flächen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_railway"><span>Gleise als 3D-Flächen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_trees" checked><span>Einzelbäume</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_treeRows"><span>Baumreihen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_hedges"><span>Hecken</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_walls"><span>Mauern / Zäune</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_poles"><span>Masten / Strommasten</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_towers"><span>Türme / Antennen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_streetLamps"><span>Straßenlaternen</span></label>
+        <label class="chk"><input type="checkbox" id="d3d_waterObjects"><span>Wasserbauwerke</span></label>
+        <div class="hint-mono" style="padding-top:7px">Tipp: Für sehr große Gebiete zuerst Brücken + Gebäude aktivieren und weitere Details nur bei Bedarf zuschalten.</div>
+      </div>
+    </section>
+
+    <!-- TERRAIN -->
+    <section class="panel" data-panel="terrain">
+      <div class="panel-head"><h2>Gelände</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div style="font-size:9.5px;color:var(--ink-faint);font-family:var(--mono);padding:0 0 5px 0;">SVG &amp; 3D: Nord oben · identische Kartenorientierung</div>
+        <label class="chk"><input type="checkbox" id="terrainEnable"><span>Gelände aktivieren</span></label>
+        <div class="subfield"><label>Auflösung</label>
+          <select id="terrainRes"><option value="24">24 × 24</option><option value="36" selected>36 × 36</option><option value="48">48 × 48</option><option value="64">64 × 64</option></select>
+        </div>
+        <div class="subfield"><label>Höhenüberhöhung</label><input type="range" id="vScale" min="0.5" max="4" step="0.1" value="1.4"></div>
+        <div class="subfield"><label>Höhenlinienabstand (m)</label><input type="number" id="contourInterval" value="5" min="1" max="100"></div>
+        <label class="chk" style="padding-left:22px"><input type="checkbox" id="contourLabels"><span style="font-size:11.5px">Höhenlinien beschriften</span></label>
+        <div class="subfield"><label>Textur-Auflösung</label>
+          <select id="textureRes">
+            <option value="512">512 px</option>
+            <option value="1024">1024 px</option>
+            <option value="2048" selected>2048 px</option>
+            <option value="4096">4096 px</option>
+            <option value="8192">8192 px</option>
+            <option value="12288">12K px</option>
+            <option value="16384">16K px</option>
+            <option value="24576">24K px</option>
+            <option value="32768">32K px</option>
+            <option value="40960">40K px</option>
+            <option value="49152">48K px</option>
+            <option value="61440">60K px</option>
+          </select>
+          <div style="font-size:9.5px;color:var(--ink-faint);font-family:var(--mono);padding-left:0;">bis 60K · sehr große Texturen benötigen viel RAM/GPU</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUILDINGS -->
+    <section class="panel" data-panel="buildings">
+      <div class="panel-head"><h2>Gebäude</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <label class="chk"><input type="checkbox" id="bld3d" checked><span>3D-Gebäude aktivieren</span></label>
+        <div style="padding-left:22px;font-size:9.5px;letter-spacing:.08em;color:var(--ink-faint);font-family:var(--mono);margin-top:2px;">HEIGHT SOURCE</div>
+        <div class="radio-group">
+          <label class="radio-row"><input type="radio" name="heightSrc" value="osm" checked><span>OSM-Höhe</span></label>
+          <label class="radio-row"><input type="radio" name="heightSrc" value="levels"><span>Geschosse des Gebäudes</span></label>
+          <label class="radio-row"><input type="radio" name="heightSrc" value="est"><span>Geschosse + geschätzte Höhe</span></label>
+        </div>
+        <div class="subfield"><label>Geschosshöhe (m)</label><input type="number" id="floorHeight" value="3.0" step="0.1"></div>
+        <label class="chk" style="padding-left:22px"><input type="checkbox" id="roofs"><span style="font-size:11.5px">Dächer</span></label>
+        <div class="subfield"><label>Gebäudeabstand (m)</label><input type="number" id="bldGap" value="0.4" step="0.1" min="0" max="3"></div>
+      </div>
+    </section>
+
+    <!-- STYLE -->
+    <section class="panel" data-panel="style">
+      <div class="panel-head"><h2>Style</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div class="style-group-label">STREETS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_streets_color" value="#cfcfcf"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_streets_width" value="0.8" step="0.1" min="0.1"></div>
+        <div class="subfield"><label>Linie</label><select id="s_streets_dash"><option value="solid" selected>Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+
+        <div class="style-group-label">RAILWAY</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_railway_color" value="#c96a4e"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_railway_width" value="0.9" step="0.1" min="0.1"></div>
+        <div class="subfield"><label>Linie</label><select id="s_railway_dash"><option value="solid">Solid</option><option value="dashed" selected>Dashed</option><option value="dotted">Dotted</option></select></div>
+
+        <div class="style-group-label">BORDERS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_borders_color" value="#d6a531"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_borders_width" value="1.0" step="0.1" min="0.1"></div>
+        <div class="subfield"><label>Linie</label><select id="s_borders_dash"><option value="solid">Solid</option><option value="dashed" selected>Dashed</option><option value="dotted">Dotted</option></select></div>
+
+        <div class="style-group-label">WATER (FLÄCHE)</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_water_color" value="#5ec8d8"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_water_opacity" min="0" max="1" step="0.05" value="0.85"></div>
+
+        <div class="style-group-label">WATERWAYS (LINIE)</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_waterlines_color" value="#5ec8d8"></div>
+        <div class="subfield"><label>Stärke</label><input type="number" id="s_waterlines_width" value="1.0" step="0.1" min="0.1"></div>
+        <div class="subfield"><label>Linie</label><select id="s_waterlines_dash"><option value="solid" selected>Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+
+        <div class="style-group-label">PARKS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_parks_color" value="#5f9e6a"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_parks_opacity" min="0" max="1" step="0.05" value="0.5"></div>
+
+        <div class="style-group-label">FORESTS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_forests_color" value="#426b42"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_forests_opacity" min="0" max="1" step="0.05" value="0.45"></div>
+
+        <div class="style-group-label">MEADOWS / GRASS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_meadows_color" value="#8da56a"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_meadows_opacity" min="0" max="1" step="0.05" value="0.35"></div>
+
+        <div class="style-group-label">FARMLAND</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_farmland_color" value="#b0a06a"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_farmland_opacity" min="0" max="1" step="0.05" value="0.28"></div>
+
+        <div class="style-group-label">SCRUB</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_scrub_color" value="#7f9662"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_scrub_opacity" min="0" max="1" step="0.05" value="0.32"></div>
+
+        <div class="style-group-label">WETLANDS</div>
+        <div class="subfield"><label>Farbe</label><input type="color" id="s_wetlands_color" value="#6e9188"></div>
+        <div class="subfield"><label>Deckkraft</label><input type="range" id="s_wetlands_opacity" min="0" max="1" step="0.05" value="0.35"></div>
+
+        <div class="style-group-label">GROUND / BACKGROUND</div>
+        <div class="subfield"><label>Bodenfläche</label><input type="color" id="s_background_color" value="#e9e7e1"></div>
+
+        <div class="style-group-label">BUILDINGS</div>
+        <div class="subfield"><label>Füllung</label><input type="color" id="s_buildings_color" value="#9a9184"></div>
+        <div class="subfield"><label>Umriss</label><input type="color" id="s_buildings_stroke" value="#5c564c"></div>
+        <div class="subfield"><label>Dach</label><input type="color" id="s_roof_color" value="#6d4f3a"></div>
+      </div>
+    </section>
+
+    <!-- 3D VIEW -->
+    <section class="panel" data-panel="view3d">
+      <div class="panel-head"><h2>3D View</h2><span class="chev">▾</span></div>
+      <div class="panel-body">
+        <div style="padding-top:4px">
+          <div class="seg" id="projSeg" style="padding-left:0">
+            <button data-v="persp" class="active">Perspektive</button>
+            <button data-v="ortho">Orthografisch</button>
+          </div>
+        </div>
+        <div class="subfield" style="padding-left:0"><label>Ground level (m)</label><input type="number" id="groundLevel" value="0" step="1"></div>
+        <label class="chk"><input type="checkbox" id="wireframe"><span>Drahtmodell</span></label>
+        <div style="padding-top:6px;padding-left:0;font-size:9.5px;letter-spacing:.08em;color:var(--ink-faint);font-family:var(--mono);border-top:1px solid var(--line);margin-top:4px;">SICHTBARKEIT 3D-DETAILS</div>
+        <label class="chk"><input type="checkbox" id="showBuildings3d" checked><span>Gebäude anzeigen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_bridges" checked><span>Brücken</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_bridgeSupports" checked><span>Brückenpfeiler / Stützen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_tunnels" checked><span>Tunnel / Unterführungen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_roads" checked><span>Straßen (3D)</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_railway" checked><span>Gleise (3D)</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_trees" checked><span>Einzelbäume</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_treeRows" checked><span>Baumreihen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_hedges" checked><span>Hecken</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_walls" checked><span>Mauern / Zäune</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_poles" checked><span>Masten / Strommasten</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_towers" checked><span>Türme / Antennen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_streetLamps" checked><span>Straßenlaternen</span></label>
+        <label class="chk"><input type="checkbox" id="v3d_waterObjects" checked><span>Wasserbauwerke</span></label>
+      </div>
+    </section>
+
+    <div class="generate-block">
+      <button id="genBtn">3D-Karte erzeugen</button>
+      <div class="status-line" id="statusLine">Standort wählen &amp; Generate klicken.</div>
+    </div>
+
+
+
+  </aside>
+
+  <main>
+    <div class="view-tabs">
+      <button id="tabMap" class="active">Karte</button>
+      <button id="tab3d">3D</button>
+      <button id="tabSvg">SVG Top-View</button>
+    </div>
+    <div id="mapview"></div>
+    <div id="view3d">
+      <div class="empty-3d" id="empty3dMsg">Noch keine 3D-Szene erzeugt.<br>Links Bereich wählen und „Generate" klicken.</div>
+      <div class="view3d-toolbar" id="toolbar3d" style="display:none;">
+        <div class="seg" id="projSeg2">
+          <button data-v="persp" class="active">Persp.</button>
+          <button data-v="ortho">Ortho</button>
+        </div>
+        <div class="export-grid view-export">
+          <button id="expPng" disabled>PNG</button>
+          <button id="expGlb" disabled>GLB</button>
+          <button id="expObj" disabled>OBJ</button>
+        </div>
+      </div>
+    </div>
+    <div id="svgview">
+      <img id="svgPreviewImg" alt="SVG Top-View" draggable="false">
+      <div class="view3d-toolbar" id="svgZoomToolbar" style="top:12px;right:12px;flex-direction:row;gap:4px;min-width:0;">
+        <button id="svgZoomOut" style="background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);padding:6px 10px;border-radius:var(--radius);cursor:pointer;">−</button>
+        <button id="svgZoomReset" style="background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);padding:6px 10px;border-radius:var(--radius);cursor:pointer;">100%</button>
+        <button id="svgZoomIn" style="background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);padding:6px 10px;border-radius:var(--radius);cursor:pointer;">+</button>
+        <button id="expSvg" disabled style="background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);padding:6px 10px;border-radius:var(--radius);cursor:pointer;">SVG</button>
+      </div>
+    </div>
+    <div class="viewport-hint" id="viewportHint">Ziehen zum Verschieben · Scrollen zum Zoomen</div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================= STATE ============================= */
+const state = {
+  lat: 51.2333, lon: 8.0064, radius: 700,
+  layers: {streets:true, buildings:true, water:true, parks:true, forests:true, meadows:true, farmland:true, scrub:true, wetlands:true, railway:false, borders:false},
+  labels: {cities:false, streets:false, water:false, poi:false},
+  terrain: {enable:false, res:36, vscale:1.4, interval:5, contourLabels:false, textureRes:2048, baseHeight:0},
+  precision: {tolerance:0},
+  buildingsCfg: {enable:true, heightSource:'osm', floorHeight:3.0, roofs:false, gap:0.4},
+  details3d: {
+    bridges:false, bridgeSupports:false, tunnels:false,
+    roads:false, railway:false, trees:true, treeRows:false,
+    hedges:false, walls:false, poles:false, towers:false, streetLamps:false,
+    waterObjects:false
+  },
+  style: {
+    streets:{color:'#cfcfcf', width:0.8, dash:'solid'},
+    railway:{color:'#c96a4e', width:0.9, dash:'dashed'},
+    borders:{color:'#d6a531', width:1.0, dash:'dashed'},
+    water:{color:'#5ec8d8', opacity:0.85},
+    waterlines:{color:'#5ec8d8', width:1.0, dash:'solid'},
+    parks:{color:'#5f9e6a', opacity:0.5},
+     forests:{color:'#426b42', opacity:0.45},
+     meadows:{color:'#8da56a', opacity:0.35},
+     farmland:{color:'#b0a06a', opacity:0.28},
+     scrub:{color:'#7f9662', opacity:0.32},
+     wetlands:{color:'#6e9188', opacity:0.35},
+    buildings:{color:'#9a9184', stroke:'#5c564c'},
+    roof:{color:'#6d4f3a'},
+    contour:{color:'#d6a531'},
+    background:{color:'#e9e7e1'}
+  },
+  view: {
+    projection:'persp', wireframe:false, showBuildings3d:true,
+    show3d:{
+      bridges:true, bridgeSupports:true, tunnels:true, roads:true, railway:true,
+      trees:true, treeRows:true, hedges:true, walls:true, poles:true, towers:true,
+      streetLamps:true, waterObjects:true
+    }
+  },
+  data: null,
+  built: false
+};
+
+/* ============================= EXTRA LAYERS: weitere Grünflächen + Bodenflächen ============================= */
+// q    = Overpass-Filter (werden mit „around“ kombiniert), test = gleiche Logik im Browser zum Zeichnen.
+// kind = area (Fläche) · line (Linie) · point (Punkt). Farbe/Deckkraft sind im jeweiligen Reiter einstellbar.
+const EXTRA_LAYERS = [
+  /* ---- Weitere Grünflächen ---- */
+  {id:'cemetery',   group:'green',  kind:'area',  label:'Friedhöfe',            color:'#8fae86', opacity:0.55, on:true,
+   q:['["landuse"="cemetery"]','["amenity"="grave_yard"]'],
+   test:t=>t.landuse==='cemetery' || t.amenity==='grave_yard'},
+  {id:'playground', group:'green',  kind:'area',  label:'Spielplätze',          color:'#b7cf8a', opacity:0.60, on:true,
+   q:['["leisure"="playground"]'],
+   test:t=>t.leisure==='playground'},
+  {id:'sports',     group:'green',  kind:'area',  label:'Sport & Freizeit',     color:'#a9d3a3', opacity:0.55, on:true,
+   q:['["leisure"~"^(sports_centre|stadium|track|miniature_golf|horse_riding|fitness_station)$"]'],
+   test:t=>['sports_centre','stadium','track','miniature_golf','horse_riding','fitness_station'].includes(t.leisure)},
+  {id:'greenery',   group:'green',  kind:'area',  label:'Beete, Grünstreifen',  color:'#9cbf86', opacity:0.55, on:true,
+   q:['["landuse"~"^(greenery|flowerbed|plant_nursery|greenhouse_horticulture)$"]','["natural"="tree_group"]'],
+   test:t=>['greenery','flowerbed','plant_nursery','greenhouse_horticulture'].includes(t.landuse) || t.natural==='tree_group'},
+  {id:'hedges',     group:'green',  kind:'line',  label:'Hecken',               color:'#5f8a55', opacity:0.90, on:true, width:1.2,
+   q:['["barrier"="hedge"]'],
+   test:t=>t.barrier==='hedge'},
+  {id:'treerows',   group:'green',  kind:'line',  label:'Baumreihen',           color:'#4f7f4a', opacity:0.80, on:true, width:2.4, dotted:true,
+   q:['["natural"="tree_row"]'],
+   test:t=>t.natural==='tree_row'},
+  {id:'trees',      group:'green',  kind:'point', label:'Einzelbäume',          color:'#5f9a5a', opacity:0.75, on:true,
+   q:['["natural"="tree"]'],
+   test:t=>t.natural==='tree'},
+
+  /* ---- Bodenflächen ---- */
+  {id:'residential',group:'ground', kind:'area',  label:'Wohnbauflächen',       color:'#dcd6c9', opacity:0.55, on:false,
+   q:['["landuse"="residential"]'],
+   test:t=>t.landuse==='residential'},
+  {id:'commercial', group:'ground', kind:'area',  label:'Gewerbe & Handel',     color:'#e3d0c4', opacity:0.55, on:false,
+   q:['["landuse"~"^(commercial|retail)$"]'],
+   test:t=>t.landuse==='commercial' || t.landuse==='retail'},
+  {id:'industrial', group:'ground', kind:'area',  label:'Industrie & Garagen',  color:'#d3ced8', opacity:0.55, on:false,
+   q:['["landuse"~"^(industrial|garages|depot)$"]'],
+   test:t=>['industrial','garages','depot'].includes(t.landuse)},
+  {id:'railland',   group:'ground', kind:'area',  label:'Bahnflächen',          color:'#d9cdd2', opacity:0.55, on:false,
+   q:['["landuse"="railway"]'],
+   test:t=>t.landuse==='railway'},
+  {id:'parking',    group:'ground', kind:'area',  label:'Parkplätze',           color:'#d8d8d4', opacity:0.75, on:false,
+   q:['["amenity"~"^(parking|parking_space|bicycle_parking)$"]'],
+   test:t=>['parking','parking_space','bicycle_parking'].includes(t.amenity)},
+  {id:'pedestrian', group:'ground', kind:'area',  label:'Plätze & Wege', tip:'Plätze, Fußgängerzonen, Flächen-Wege (area:highway)', color:'#eae3d2', opacity:0.85, on:false,
+   q:['["highway"]["area"="yes"]','["area:highway"]','["place"="square"]'],
+   test:t=>(t.highway && t.area==='yes') || !!t['area:highway'] || t.place==='square'},
+  {id:'institutional', group:'ground', kind:'area', label:'Institutionen', tip:'Schulen, Hochschulen, Kitas, Kliniken, Kirchen, Militär', color:'#e0d8c6', opacity:0.55, on:false,
+   q:['["amenity"~"^(school|university|college|kindergarten|hospital|place_of_worship|social_facility)$"]','["landuse"~"^(education|institutional|religious|military)$"]'],
+   test:t=>!t.building && (['school','university','college','kindergarten','hospital','place_of_worship','social_facility'].includes(t.amenity) || ['education','institutional','religious','military'].includes(t.landuse))},
+  {id:'construction', group:'ground', kind:'area', label:'Brach- & Bauland',    color:'#d8ccb4', opacity:0.60, on:false,
+   q:['["landuse"~"^(construction|brownfield|quarry|landfill|farmyard)$"]'],
+   test:t=>['construction','brownfield','quarry','landfill','farmyard'].includes(t.landuse)},
+  {id:'sand',       group:'ground', kind:'area',  label:'Sand, Fels, Kies',     color:'#e6dcb4', opacity:0.70, on:false,
+   q:['["natural"~"^(sand|bare_rock|beach|scree|shingle|mud|dune)$"]'],
+   test:t=>['sand','bare_rock','beach','scree','shingle','mud','dune'].includes(t.natural)},
+  {id:'pools',      group:'ground', kind:'area',  label:'Schwimmbecken',        color:'#bfe3ea', opacity:0.85, on:false,
+   q:['["leisure"~"^(swimming_pool|water_park)$"]'],
+   test:t=>t.leisure==='swimming_pool' || t.leisure==='water_park'}
+];
+state.extra = {};
+EXTRA_LAYERS.forEach(d=>{ state.extra[d.id] = {enabled:d.on, color:d.color, opacity:d.opacity}; });
+state.parcels = {enable:false, source:'alkis', labels:false, fences:false};
+state.style.parcels = {color:'#b0603f', width:0.5, dash:'solid', fill:'#d6a531', fillOpacity:0};
+state.style.fences  = {color:'#8a7f6a', width:0.4};
+
+
+/* ============================= UI: collapse panels ============================= */
+document.querySelectorAll('.panel-head').forEach(h=>{
+  h.addEventListener('click', ()=>{
+    h.classList.toggle('collapsed');
+    h.nextElementSibling.classList.toggle('hidden');
+  });
+});
+// Style panel starts collapsed (long list of controls)
+document.querySelector('.panel[data-panel="style"] .panel-head').click();
+
+/* ============================= UI: bind inputs -> state ============================= */
+function syncHeader(){
+  document.getElementById('hdrLat').textContent = state.lat.toFixed(5);
+  document.getElementById('hdrLon').textContent = state.lon.toFixed(5);
+  document.getElementById('hdrRad').textContent = Math.round(state.radius);
+}
+const latInput = document.getElementById('latInput');
+const lonInput = document.getElementById('lonInput');
+const radInput = document.getElementById('radInput');
+function setLocation(lat, lon, rad, fromMap){
+  state.lat = lat; state.lon = lon;
+  if(rad!==undefined) state.radius = rad;
+  latInput.value = lat.toFixed(5);
+  lonInput.value = lon.toFixed(5);
+  radInput.value = Math.round(state.radius);
+  syncHeader();
+  if(!fromMap) placeMarker();
+}
+latInput.addEventListener('change', ()=>setLocation(parseFloat(latInput.value)||0, state.lon, state.radius));
+lonInput.addEventListener('change', ()=>setLocation(state.lat, parseFloat(lonInput.value)||0, state.radius));
+radInput.addEventListener('change', ()=>{state.radius=Math.max(50,parseFloat(radInput.value)||700); placeMarker(); syncHeader();});
+
+['streets','buildings','water','parks','forests','meadows','farmland','scrub','wetlands','railway','borders'].forEach(k=>{
+  document.getElementById('lyr_'+k).addEventListener('change', e=> state.layers[k]=e.target.checked );
+});
+document.getElementById('precisionSlider').addEventListener('input', e=> state.precision.tolerance=parseFloat(e.target.value) );
+['cities','streets','water','poi'].forEach(k=>{
+  document.getElementById('lbl_'+k).addEventListener('change', e=> state.labels[k]=e.target.checked );
+});
+document.getElementById('terrainEnable').addEventListener('change', e=> state.terrain.enable=e.target.checked );
+document.getElementById('terrainRes').addEventListener('change', e=> state.terrain.res=parseInt(e.target.value) );
+document.getElementById('vScale').addEventListener('input', e=>{ state.terrain.vscale=parseFloat(e.target.value); applyVerticalScale(); });
+document.getElementById('contourInterval').addEventListener('change', e=> state.terrain.interval=Math.max(1,parseFloat(e.target.value)||5) );
+document.getElementById('contourLabels').addEventListener('change', e=> state.terrain.contourLabels=e.target.checked );
+document.getElementById('textureRes').addEventListener('change', e=> state.terrain.textureRes=parseInt(e.target.value) );
+
+document.getElementById('bld3d').addEventListener('change', e=> state.buildingsCfg.enable=e.target.checked );
+document.querySelectorAll('input[name=heightSrc]').forEach(r=>{
+  r.addEventListener('change', e=>{ if(e.target.checked) state.buildingsCfg.heightSource=e.target.value; });
+});
+document.getElementById('floorHeight').addEventListener('change', e=> state.buildingsCfg.floorHeight=parseFloat(e.target.value)||3.0 );
+document.getElementById('roofs').addEventListener('change', e=> state.buildingsCfg.roofs=e.target.checked );
+document.getElementById('bldGap').addEventListener('change', e=> state.buildingsCfg.gap=Math.max(0,parseFloat(e.target.value)||0) );
+/* 3D-Detail-Schalter */
+[
+  'bridges','bridgeSupports','tunnels','roads','railway','trees','treeRows',
+  'hedges','walls','poles','towers','streetLamps','waterObjects'
+].forEach(k=>{
+  const el=document.getElementById('d3d_'+k);
+  if(el) el.addEventListener('change', e=>state.details3d[k]=e.target.checked);
+});
+
+/* style bindings */
+function bindStyleColor(id, obj, key){ document.getElementById(id).addEventListener('input', e=> obj[key]=e.target.value ); }
+function bindStyleNum(id, obj, key){ document.getElementById(id).addEventListener('input', e=> obj[key]=parseFloat(e.target.value) ); }
+function bindStyleSel(id, obj, key){ document.getElementById(id).addEventListener('change', e=> obj[key]=e.target.value ); }
+bindStyleColor('s_streets_color', state.style.streets, 'color');
+bindStyleNum('s_streets_width', state.style.streets, 'width');
+bindStyleSel('s_streets_dash', state.style.streets, 'dash');
+bindStyleColor('s_railway_color', state.style.railway, 'color');
+bindStyleNum('s_railway_width', state.style.railway, 'width');
+bindStyleSel('s_railway_dash', state.style.railway, 'dash');
+bindStyleColor('s_borders_color', state.style.borders, 'color');
+bindStyleNum('s_borders_width', state.style.borders, 'width');
+bindStyleSel('s_borders_dash', state.style.borders, 'dash');
+bindStyleColor('s_water_color', state.style.water, 'color');
+bindStyleNum('s_water_opacity', state.style.water, 'opacity');
+bindStyleColor('s_waterlines_color', state.style.waterlines, 'color');
+bindStyleNum('s_waterlines_width', state.style.waterlines, 'width');
+bindStyleSel('s_waterlines_dash', state.style.waterlines, 'dash');
+bindStyleColor('s_parks_color', state.style.parks, 'color');
+bindStyleNum('s_parks_opacity', state.style.parks, 'opacity');
+bindStyleColor('s_forests_color', state.style.forests, 'color');
+bindStyleNum('s_forests_opacity', state.style.forests, 'opacity');
+bindStyleColor('s_meadows_color', state.style.meadows, 'color');
+bindStyleNum('s_meadows_opacity', state.style.meadows, 'opacity');
+bindStyleColor('s_farmland_color', state.style.farmland, 'color');
+bindStyleNum('s_farmland_opacity', state.style.farmland, 'opacity');
+bindStyleColor('s_scrub_color', state.style.scrub, 'color');
+bindStyleNum('s_scrub_opacity', state.style.scrub, 'opacity');
+bindStyleColor('s_wetlands_color', state.style.wetlands, 'color');
+bindStyleNum('s_wetlands_opacity', state.style.wetlands, 'opacity');
+bindStyleColor('s_buildings_color', state.style.buildings, 'color');
+bindStyleColor('s_buildings_stroke', state.style.buildings, 'stroke');
+bindStyleColor('s_roof_color', state.style.roof, 'color');
+bindStyleColor('s_background_color', state.style.background, 'color');
+document.getElementById('s_background_color').addEventListener('input', ()=>{
+  if(renderer) renderer.setClearColor(state.style.background.color, 1);
+  document.getElementById('view3d').style.background = state.style.background.color;
+  document.getElementById('svgview').style.background = state.style.background.color;
+});
+
+function bindProjSeg(id){
+  document.querySelectorAll('#'+id+' button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      state.view.projection = b.dataset.v;
+      syncProjSegs();
+      rebuildCamera();
+    });
+  });
+}
+bindProjSeg('projSeg'); bindProjSeg('projSeg2');
+function syncProjSegs(){
+  ['projSeg','projSeg2'].forEach(id=>{
+    document.querySelectorAll('#'+id+' button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.v===state.view.projection);
+    });
+  });
+}
+document.getElementById('wireframe').addEventListener('change', e=>{ state.view.wireframe=e.target.checked; applyWireframe(); });
+document.getElementById('showBuildings3d').addEventListener('change', e=>{
+  state.view.showBuildings3d = e.target.checked;
+  if(buildingsGroup) buildingsGroup.visible = e.target.checked;
+});
+/* Sichtbarkeits-Schalter je 3D-Detail-Kategorie (wirkt auf bereits erzeugte Szene) */
+Object.keys(state.view.show3d).forEach(k=>{
+  const el=document.getElementById('v3d_'+k);
+  if(!el) return;
+  el.addEventListener('change', e=>{
+    state.view.show3d[k]=e.target.checked;
+    if(details3dGroup){
+      const label=DETAIL3D_GROUP_LABELS[k];
+      const sub=details3dGroup.children.find(c=>c.name===label);
+      if(sub) sub.visible=e.target.checked;
+    }
+  });
+});
+
+/* ============================= UI: weitere Grünflächen / Bodenflächen / Grundstücke / Ground level ============================= */
+(function buildExtraUI(){
+  const hosts = {green:document.getElementById('extraGreenList'), ground:document.getElementById('extraGroundList')};
+  EXTRA_LAYERS.forEach(d=>{
+    const row = document.createElement('div');
+    row.className = 'lyr-row';
+    row.innerHTML = `<label class="chk"><input type="checkbox" id="x_${d.id}"${d.on?' checked':''}><span title="${d.tip||d.label}">${d.label}</span></label>`
+      + `<input type="color" id="xc_${d.id}" value="${d.color}" title="Farbe">`
+      + `<input type="range" id="xo_${d.id}" min="0" max="1" step="0.05" value="${d.opacity}" title="Deckkraft">`;
+    hosts[d.group].appendChild(row);
+    document.getElementById('x_'+d.id).addEventListener('change', e=> state.extra[d.id].enabled = e.target.checked);
+    document.getElementById('xc_'+d.id).addEventListener('input',  e=> state.extra[d.id].color = e.target.value);
+    document.getElementById('xo_'+d.id).addEventListener('input',  e=> state.extra[d.id].opacity = parseFloat(e.target.value));
+  });
+})();
+document.getElementById('prc_enable').addEventListener('change', e=> state.parcels.enable = e.target.checked);
+document.getElementById('prc_source').addEventListener('change', e=> state.parcels.source = e.target.value);
+document.getElementById('prc_labels').addEventListener('change', e=> state.parcels.labels = e.target.checked);
+document.getElementById('prc_fences').addEventListener('change', e=> state.parcels.fences = e.target.checked);
+bindStyleColor('s_prc_color', state.style.parcels, 'color');
+bindStyleNum('s_prc_width', state.style.parcels, 'width');
+bindStyleSel('s_prc_dash', state.style.parcels, 'dash');
+bindStyleColor('s_prc_fill', state.style.parcels, 'fill');
+bindStyleNum('s_prc_fillop', state.style.parcels, 'fillOpacity');
+bindStyleColor('s_fence_color', state.style.fences, 'color');
+bindStyleNum('s_fence_width', state.style.fences, 'width');
+document.getElementById('groundLevel').addEventListener('input', e=>{ state.terrain.baseHeight = parseFloat(e.target.value)||0; applyGroundLevel(); });
+
+/* ============================= LEAFLET MAP ============================= */
+const map = L.map('mapview', {zoomControl:true, attributionControl:true}).setView([state.lat, state.lon], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19, attribution:'© OpenStreetMap contributors'
+}).addTo(map);
+
+let marker, circle;
+function placeMarker(){
+  if(marker){ map.removeLayer(marker); map.removeLayer(circle); }
+  marker = L.marker([state.lat, state.lon]).addTo(map);
+  circle = L.circle([state.lat, state.lon], {radius: state.radius, color:'#d6a531', weight:1.5, fillColor:'#d6a531', fillOpacity:.08}).addTo(map);
+}
+placeMarker();
+setLocation(state.lat, state.lon, state.radius, true);
+
+map.on('click', (e)=>{
+  setLocation(e.latlng.lat, e.latlng.lng, state.radius, true);
+  placeMarker();
+});
+
+/* geocoding search via Nominatim */
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ doSearch(searchInput.value); } });
+async function doSearch(q){
+  if(!q || q.trim().length<2) return;
+  setStatus('Suche „'+q+'"…');
+  try{
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const res = await fetch(url, {headers:{'Accept':'application/json'}});
+    const arr = await res.json();
+    if(arr && arr.length){
+      const r = arr[0];
+      map.setView([parseFloat(r.lat), parseFloat(r.lon)], 15);
+      setLocation(parseFloat(r.lat), parseFloat(r.lon), state.radius, true);
+      placeMarker();
+      setStatus('Gefunden: '+r.display_name.split(',').slice(0,3).join(', '), 'ok');
+    } else {
+      setStatus('Kein Ergebnis für „'+q+'".', 'err');
+    }
+  } catch(err){
+    setStatus('Suche blockiert — Datei über einen lokalen Server öffnen (nicht per Doppelklick).', 'err');
+  }
+}
+
+/* ============================= TAB SWITCH ============================= */
+const tabMap=document.getElementById('tabMap'), tab3d=document.getElementById('tab3d'), tabSvg=document.getElementById('tabSvg');
+const mapview=document.getElementById('mapview'), view3d=document.getElementById('view3d'), svgview=document.getElementById('svgview');
+const viewportHint=document.getElementById('viewportHint');
+function activateTab(which){
+  [tabMap,tab3d,tabSvg].forEach(t=>t.classList.remove('active'));
+  mapview.style.display='none'; view3d.style.display='none'; svgview.style.display='none';
+  if(which==='map'){ tabMap.classList.add('active'); mapview.style.display='block'; viewportHint.textContent='Ziehen zum Verschieben · Scrollen zum Zoomen'; viewportHint.style.display='block'; }
+  if(which==='3d'){ tab3d.classList.add('active'); view3d.style.display='block'; viewportHint.textContent='Linksklick: Orbit · Rechtsklick: Pan · Scrollen: Zoom'; viewportHint.style.display='block'; setTimeout(()=>{ if(renderer) onResize(); }, 30); }
+  if(which==='svg'){ tabSvg.classList.add('active'); svgview.style.display='flex'; viewportHint.textContent='Scrollen: Zoom · Ziehen: Verschieben'; viewportHint.style.display='block'; setTimeout(()=>{ fitSvgImageToContainer(); updateSvgTransform(); }, 30); }
+}
+tabMap.addEventListener('click', ()=>activateTab('map'));
+tab3d.addEventListener('click', ()=>activateTab('3d'));
+tabSvg.addEventListener('click', ()=>activateTab('svg'));
+
+/* ============================= SVG VIEW: zoom & pan ============================= */
+let svgZoom = {scale:1, tx:0, ty:0};
+const svgPreviewImg = document.getElementById('svgPreviewImg');
+function updateSvgTransform(){
+  svgPreviewImg.style.transform = `translate(-50%, -50%) translate(${svgZoom.tx}px, ${svgZoom.ty}px) scale(${svgZoom.scale})`;
+}
+function svgZoomBy(factor){
+  svgZoom.scale = Math.min(100, Math.max(0.05, svgZoom.scale*factor));
+  updateSvgTransform();
+  document.getElementById('svgZoomReset').textContent = Math.round(svgZoom.scale*100)+'%';
+}
+function svgZoomResetFn(){
+  svgZoom = {scale:1, tx:0, ty:0};
+  updateSvgTransform();
+  document.getElementById('svgZoomReset').textContent = '100%';
+}
+function fitSvgImageToContainer(){
+  // The SVG view is initially display:none. Only calculate the fit after it is visible,
+  // otherwise clientWidth/clientHeight are zero and the preview collapses to a tiny image.
+  const containerW = svgview.clientWidth, containerH = svgview.clientHeight;
+  if(containerW < 10 || containerH < 10) return;
+  const natW = svgPreviewImg.naturalWidth||1000, natH = svgPreviewImg.naturalHeight||1000;
+  const fit = Math.min((containerW*0.96)/natW, (containerH*0.96)/natH);
+  svgPreviewImg.style.width = Math.max(1, natW*fit)+'px';
+  svgPreviewImg.style.height = Math.max(1, natH*fit)+'px';
+}
+svgPreviewImg.addEventListener('load', ()=>{ fitSvgImageToContainer(); svgZoomResetFn(); });
+svgview.addEventListener('wheel', e=>{ e.preventDefault(); svgZoomBy(e.deltaY<0?1.15:1/1.15); }, {passive:false});
+document.getElementById('svgZoomIn').addEventListener('click', ()=>svgZoomBy(1.25));
+document.getElementById('svgZoomOut').addEventListener('click', ()=>svgZoomBy(1/1.25));
+document.getElementById('svgZoomReset').addEventListener('click', svgZoomResetFn);
+
+let svgDragging=false, svgLastX=0, svgLastY=0;
+svgview.addEventListener('mousedown', e=>{
+  if(e.target.closest('.view3d-toolbar')) return;
+  svgDragging=true; svgLastX=e.clientX; svgLastY=e.clientY; svgview.classList.add('dragging');
+});
+window.addEventListener('mousemove', e=>{
+  if(!svgDragging) return;
+  svgZoom.tx += e.clientX-svgLastX; svgZoom.ty += e.clientY-svgLastY;
+  svgLastX=e.clientX; svgLastY=e.clientY;
+  updateSvgTransform();
+});
+window.addEventListener('mouseup', ()=>{ svgDragging=false; svgview.classList.remove('dragging'); });
+window.addEventListener('resize', ()=>{ if(svgview.style.display!=='none') fitSvgImageToContainer(); });
+
+/* ============================= STATUS ============================= */
+function setStatus(msg, kind){
+  const el = document.getElementById('statusLine');
+  el.textContent = msg;
+  el.className = 'status-line' + (kind ? ' '+kind : '');
+}
+
+/* ============================= PROJECTION + SIMPLIFICATION ============================= */
+let originLat=0, originLon=0;
+function project(lat, lon){
+  const R = 6378137;
+  const x = (lon-originLon) * Math.PI/180 * R * Math.cos(originLat*Math.PI/180);
+  const y = (lat-originLat) * Math.PI/180 * R;
+  return {x, y};
+}
+function perpendicularDistance(p, a, b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const len2 = dx*dx+dy*dy;
+  if(len2===0) return Math.hypot(p.x-a.x, p.y-a.y);
+  const t = ((p.x-a.x)*dx+(p.y-a.y)*dy)/len2;
+  const projx=a.x+t*dx, projy=a.y+t*dy;
+  return Math.hypot(p.x-projx, p.y-projy);
+}
+function rdpSimplify(points, epsilon){
+  if(points.length<3 || epsilon<=0) return points.slice();
+  let dmax=0, index=0;
+  const a=points[0], b=points[points.length-1];
+  for(let i=1;i<points.length-1;i++){
+    const d = perpendicularDistance(points[i], a, b);
+    if(d>dmax){ dmax=d; index=i; }
+  }
+  if(dmax>epsilon){
+    const left = rdpSimplify(points.slice(0,index+1), epsilon);
+    const right = rdpSimplify(points.slice(index), epsilon);
+    return left.slice(0,-1).concat(right);
+  }
+  return [a,b];
+}
+function projectAndSimplifyWay(w, closed){
+  const raw = w.geometry.map(g=>project(g.lat,g.lon));
+  if(raw.length<2) return raw;
+  const isClosed = closed && raw.length>2 &&
+    Math.abs(raw[0].x-raw[raw.length-1].x)<1e-6 && Math.abs(raw[0].y-raw[raw.length-1].y)<1e-6;
+  const src = isClosed ? raw.slice(0,-1) : raw;
+  let simp = rdpSimplify(src, state.precision.tolerance);
+  if(isClosed && simp.length>2) simp = simp.concat([simp[0]]);
+  return simp;
+}
+// shrink a polygon's vertices toward its centroid by a fixed distance (meters) -> visible gap between adjacent buildings
+function insetPolygon(pts, margin){
+  if(margin<=0) return pts;
+  const n = pts.length;
+  const centroid = pts.reduce((a,p)=>({x:a.x+p.x/n, y:a.y+p.y/n}), {x:0,y:0});
+  return pts.map(p=>{
+    const dx=p.x-centroid.x, dy=p.y-centroid.y;
+    const dist=Math.hypot(dx,dy);
+    if(dist<0.05) return {x:p.x,y:p.y};
+    const factor = Math.max(0.3, (dist-margin)/dist);
+    return {x:centroid.x+dx*factor, y:centroid.y+dy*factor};
+  });
+}
+
+/* ============================= OVERPASS FETCH (with mirrors) ============================= */
+function buildOverpassQuery(lat, lon, radius){
+  const parts = [];
+  // Datenradius = 1.5 × Radius: die Karte ist ein QUADRAT, dessen Ecken 1.41 × Radius vom Mittelpunkt entfernt liegen.
+  // Mit einem kleineren Suchkreis blieben die Ecken (und alles, was über den Rand hinausragt) leer.
+  const dataRadius = Math.round(radius * 1.5);
+  const around = `(around:${dataRadius},${lat},${lon})`;
+  const wr = sel => `way${sel}${around};relation${sel}${around};`;   // Way + Multipolygon-Relation
+  if(state.layers.streets) parts.push(`way["highway"]${around};`);
+  if(state.layers.buildings) parts.push(`way["building"]${around};`);
+  if(state.layers.water) parts.push(wr('["natural"="water"]') + `way["waterway"]${around};`);
+  if(state.layers.parks) parts.push(wr('["leisure"~"^(park|recreation_ground|village_green|common|garden|nature_reserve|golf_course|dog_park|pitch)$"]') + wr('["landuse"~"^(recreation_ground|village_green)$"]'));
+  if(state.layers.forests) parts.push(wr('["landuse"="forest"]') + wr('["natural"="wood"]'));
+  if(state.layers.meadows) parts.push(wr('["landuse"~"^(meadow|grass|allotments|greenfield|conservation)$"]') + wr('["natural"~"^(grass|grassland|heath|moor|shrubbery)$"]') + wr('["leisure"~"^(garden|common)$"]'));
+  if(state.layers.farmland) parts.push(wr('["landuse"~"^(farmland|orchard|vineyard)$"]'));
+  if(state.layers.scrub) parts.push(wr('["natural"~"^(scrub|fell)$"]'));
+  if(state.layers.wetlands) parts.push(wr('["natural"="wetland"]'));
+  if(state.layers.railway) parts.push(`way["railway"]${around};`);
+  if(state.layers.borders) parts.push(`way["boundary"="administrative"]${around};`);
+
+  // 3D-Bauwerke und Objekte
+  if(state.details3d.bridges){
+    parts.push(`way["bridge"]${around};`);
+    parts.push(`way["man_made"="bridge"]${around};`);
+    parts.push(`way["building"="bridge"]${around};`);
+    parts.push(`relation["man_made"="bridge"]${around};`);
+  }
+  if(state.details3d.tunnels){
+    parts.push(`way["tunnel"]${around};`);
+    parts.push(`way["man_made"="tunnel"]${around};`);
+  }
+  if(state.details3d.roads) parts.push(`way["highway"]${around};`);
+  if(state.details3d.railway) parts.push(`way["railway"]${around};`);
+  if(state.details3d.trees || state.details3d.treeRows) {
+    parts.push(`node["natural"="tree"]${around};`);
+    parts.push(`way["natural"="tree_row"]${around};`);
+  }
+  if(state.details3d.hedges) parts.push(`way["barrier"="hedge"]${around};`);
+  if(state.details3d.walls) parts.push(`way["barrier"~"^(wall|fence|retaining_wall|city_wall)$"]${around};`);
+  if(state.details3d.poles) parts.push(`node["power"~"^(pole|tower)$"]${around};`);
+  if(state.details3d.towers) {
+    parts.push(`node["man_made"~"^(tower|mast|communications_tower)$"]${around};`);
+    parts.push(`way["man_made"~"^(tower|mast)$"]${around};`);
+  }
+  if(state.details3d.streetLamps) parts.push(`node["highway"="street_lamp"]${around};`);
+  if(state.details3d.waterObjects) {
+    parts.push(`way["man_made"~"^(pier|breakwater|dam|water_tower)$"]${around};`);
+  }
+
+  // weitere Grünflächen + Bodenflächen (Reiter)
+  EXTRA_LAYERS.forEach(d=>{
+    if(!state.extra[d.id].enabled) return;
+    d.q.forEach(sel=>{
+      if(d.kind==='area') parts.push(wr(sel));
+      else if(d.kind==='line') parts.push(`way${sel}${around};`);
+      else parts.push(`node${sel}${around};`);
+    });
+  });
+  // Grundstücke (OSM-Quelle) + Zäune/Mauern als Grundstücksgrenzen
+  if(state.parcels.enable && state.parcels.source==='osm') parts.push(wr('["place"="plot"]') + wr('["boundary"="lot"]'));
+  if(state.parcels.fences) parts.push(`way["barrier"~"^(fence|wall|retaining_wall|city_wall)$"]${around};`);
+  if(state.labels.cities) parts.push(`node["place"~"city|town|village|hamlet"]${around};`);
+  if(state.labels.poi) parts.push(`node["amenity"]${around};node["shop"]${around};`);
+  if(parts.length===0) parts.push(`way["highway"]${around};`);
+  return `[out:json][timeout:60];(${parts.join('')});out body geom;`;
+}
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter'
+];
+async function fetchOverpass(lat, lon, radius){
+  const q = buildOverpassQuery(lat, lon, radius);
+  let lastErr = null;
+  for(const endpoint of OVERPASS_ENDPOINTS){
+    try{
+      setStatus('Lade Kartendaten ('+endpoint.replace('https://','').split('/')[0]+')…');
+      const res = await fetch(endpoint, { method:'POST', body:'data='+encodeURIComponent(q) });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const json = await res.json();
+      return json.elements || [];
+    } catch(err){ lastErr = err; continue; }
+  }
+  throw new Error('Overpass nicht erreichbar ('+(lastErr?lastErr.message:'?')+'). Kleineren Radius versuchen oder erneut klicken.');
+}
+
+/* ============================= ELEVATION FETCH (with fallback provider) ============================= */
+async function fetchElevationChunk_openElevation(chunk){
+  const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({locations:chunk})
+  });
+  if(!res.ok) throw new Error('open-elevation HTTP '+res.status);
+  const j = await res.json();
+  return (j.results||[]).map(r=>r.elevation||0);
+}
+async function fetchElevationChunk_openTopoData(chunk){
+  const locStr = chunk.map(l=>l.latitude.toFixed(5)+','+l.longitude.toFixed(5)).join('|');
+  const res = await fetch('https://api.opentopodata.org/v1/srtm90m?locations='+encodeURIComponent(locStr));
+  if(!res.ok) throw new Error('opentopodata HTTP '+res.status);
+  const j = await res.json();
+  return (j.results||[]).map(r=>r.elevation||0);
+}
+const ELEVATION_PROVIDERS = [
+  {name:'open-elevation', chunkSize:300, fetchChunk:fetchElevationChunk_openElevation},
+  {name:'opentopodata', chunkSize:100, fetchChunk:fetchElevationChunk_openTopoData}
+];
+async function fetchElevationGrid(lat, lon, radius, res){
+  const R=6378137;
+  const dLat = (radius/R)*(180/Math.PI);
+  const dLon = (radius/(R*Math.cos(lat*Math.PI/180)))*(180/Math.PI);
+  const locations = [];
+  for(let j=0;j<res;j++){
+    for(let i=0;i<res;i++){
+      const la = lat - dLat + (2*dLat)*(j/(res-1));
+      const lo = lon - dLon + (2*dLon)*(i/(res-1));
+      locations.push({latitude:la, longitude:lo});
+    }
+  }
+  let lastErr = null;
+  for(const provider of ELEVATION_PROVIDERS){
+    try{
+      const heights = new Array(locations.length).fill(0);
+      for(let s=0; s<locations.length; s+=provider.chunkSize){
+        setStatus('Lade Höhendaten ('+provider.name+', '+Math.min(100,Math.round((s/locations.length)*100))+'%)…');
+        const chunk = locations.slice(s, s+provider.chunkSize);
+        const elevs = await provider.fetchChunk(chunk);
+        for(let idx=0; idx<chunk.length; idx++) heights[s+idx] = elevs[idx] || 0;
+      }
+      return {res, heights};
+    } catch(err){ lastErr = err; continue; }
+  }
+  throw new Error('Höhendaten nicht erreichbar ('+(lastErr?lastErr.message:'?')+'). Terrain ggf. kurz deaktivieren.');
+}
+
+/* ============================= MARCHING SQUARES (contours) ============================= */
+function marchingSquares(grid, res, cellSize, minH, interval){
+  const lines = [];
+  const levels = [];
+  const maxH = Math.max(...grid);
+  for(let lv = Math.ceil(minH/interval)*interval; lv<=maxH; lv+=interval) levels.push(lv);
+  levels.forEach(level=>{
+    const segs = [];
+    for(let j=0;j<res-1;j++){
+      for(let i=0;i<res-1;i++){
+        const v0=grid[j*res+i], v1=grid[j*res+i+1], v2=grid[(j+1)*res+i+1], v3=grid[(j+1)*res+i];
+        const p0={x:i*cellSize,y:j*cellSize}, p1={x:(i+1)*cellSize,y:j*cellSize};
+        const p2={x:(i+1)*cellSize,y:(j+1)*cellSize}, p3={x:i*cellSize,y:(j+1)*cellSize};
+        let idx=0;
+        if(v0>level) idx|=1; if(v1>level) idx|=2; if(v2>level) idx|=4; if(v3>level) idx|=8;
+        if(idx===0||idx===15) continue;
+        const lerp=(a,b,va,vb)=>{ const t=(level-va)/((vb-va)||1e-6); return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t}; };
+        const eTop=()=>lerp(p0,p1,v0,v1), eRight=()=>lerp(p1,p2,v1,v2), eBot=()=>lerp(p3,p2,v3,v2), eLeft=()=>lerp(p0,p3,v0,v3);
+        const cases = {
+          1:[eLeft,eTop],2:[eTop,eRight],3:[eLeft,eRight],4:[eRight,eBot],
+          5:[[eLeft,eTop],[eRight,eBot]],6:[eTop,eBot],7:[eLeft,eBot],
+          8:[eLeft,eBot],9:[eTop,eBot],10:[[eTop,eRight],[eLeft,eBot]],
+          11:[eRight,eBot],12:[eLeft,eRight],13:[eTop,eRight],14:[eLeft,eTop]
+        };
+        let c = cases[idx];
+        if(!c) continue;
+        if(idx===5||idx===10){ c.forEach(pair=> segs.push({level, a:pair[0](), b:pair[1]()})); }
+        else { segs.push({level, a:c[0](), b:c[1]()}); }
+      }
+    }
+    lines.push({level, segs});
+  });
+  return lines;
+}
+
+/* ============================= OVERPASS DATA CLASSIFICATION ============================= */
+// Setzt lose Way-Stücke (Mitglieder einer Multipolygon-Relation) zu geschlossenen Ringen zusammen.
+function assembleRings(pieces){
+  const key = p => p.lat.toFixed(7)+','+p.lon.toFixed(7);
+  const segs = pieces.filter(g=>g && g.length>1).map(g=>g.slice());
+  const rings = [];
+  while(segs.length){
+    let cur = segs.shift();
+    let guard = 0;
+    while(key(cur[0])!==key(cur[cur.length-1]) && guard++<20000){
+      const endK = key(cur[cur.length-1]);
+      let found = -1, rev = false;
+      for(let i=0;i<segs.length;i++){
+        if(key(segs[i][0])===endK){ found=i; break; }
+        if(key(segs[i][segs[i].length-1])===endK){ found=i; rev=true; break; }
+      }
+      if(found<0) break;
+      const nx = segs.splice(found,1)[0];
+      if(rev) nx.reverse();
+      cur = cur.concat(nx.slice(1));
+    }
+    if(cur.length>2) rings.push(cur);
+  }
+  return rings;
+}
+function classifyWays(elements){
+  const ways = elements.filter(el=>el.type==='way' && el.geometry && el.geometry.length>1);
+  const nodes = elements.filter(el=>el.type==='node');
+
+  // Große Wälder, Parks, Seen, Friedhöfe … sind in OSM meist Multipolygon-Relationen.
+  // Ihre Mitglieder werden zu Ringen verbunden (outer + inner) und als EIN Objekt mit mehreren Ringen
+  // gezeichnet (fill-rule evenodd) -> Löcher (Inseln, Lichtungen) bleiben korrekt ausgespart.
+  const relWays = [];
+  elements.filter(el=>el.type==='relation' && el.tags && (el.tags.type==='multipolygon' || el.tags.type==='boundary')).forEach(rel=>{
+    const outer = [], inner = [];
+    (rel.members||[]).forEach(m=>{
+      if(m.type!=='way' || !m.geometry || m.geometry.length<2) return;
+      (m.role==='inner' ? inner : outer).push(m.geometry);
+    });
+    const rings = assembleRings(outer).concat(assembleRings(inner));
+    if(!rings.length) return;
+    relWays.push({ id:'rel_'+rel.id, tags:rel.tags, rings, geometry:[].concat.apply([], rings), __relation:true });
+  });
+
+  return {ways: ways.concat(relWays), nodes};
+}
+/* ============================= BUILDING HEIGHT HELPERS ============================= */
+function wayHeightMeters(tags){
+  const cfg = state.buildingsCfg;
+  if(cfg.heightSource==='osm'){
+    if(tags.height) return parseFloat(tags.height)||defaultHeight(cfg);
+    if(tags['building:height']) return parseFloat(tags['building:height'])||defaultHeight(cfg);
+    if(tags['building:levels']) return parseFloat(tags['building:levels'])*cfg.floorHeight;
+    return defaultHeight(cfg);
+  } else if(cfg.heightSource==='levels'){
+    if(tags['building:levels']) return parseFloat(tags['building:levels'])*cfg.floorHeight;
+    return defaultHeight(cfg);
+  } else {
+    const lv = tags['building:levels'] ? parseFloat(tags['building:levels']) : estimateLevels(tags);
+    return lv*cfg.floorHeight;
+  }
+}
+function estimateLevels(tags){
+  if(tags.building==='house' || tags.building==='detached') return 2;
+  if(tags.building==='apartments') return 5;
+  if(tags.building==='commercial' || tags.building==='retail') return 2;
+  if(tags.building==='industrial' || tags.building==='warehouse') return 1;
+  return 3;
+}
+function defaultHeight(cfg){ return estimateLevels({})*cfg.floorHeight; }
+function shapeArea(pts){
+  let a=0; for(let i=0;i<pts.length;i++){ const p1=pts[i], p2=pts[(i+1)%pts.length]; a += p1.x*p2.y - p2.x*p1.y; }
+  return Math.abs(a/2);
+}
+function buildHipRoofGeometry(pts2d, baseY, roofH, shrink){
+  const n = pts2d.length;
+  const centroid = pts2d.reduce((a,p)=>({x:a.x+p.x/n, y:a.y+p.y/n}), {x:0,y:0});
+  const top = pts2d.map(p=>({x: centroid.x+(p.x-centroid.x)*shrink, y: centroid.y+(p.y-centroid.y)*shrink}));
+  const topY = baseY+roofH;
+  const positions = [];
+  const pushTri=(a,b,c)=>{ positions.push(a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z); };
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    const b0={x:pts2d[i].x,y:baseY,z:-pts2d[i].y}, b1={x:pts2d[j].x,y:baseY,z:-pts2d[j].y};
+    const t0={x:top[i].x,y:topY,z:-top[i].y}, t1={x:top[j].x,y:topY,z:-top[j].y};
+    pushTri(b0,b1,t1); pushTri(b0,t1,t0);
+  }
+  const c={x:centroid.x,y:topY,z:-centroid.y};
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    const t0={x:top[i].x,y:topY,z:-top[i].y}, t1={x:top[j].x,y:topY,z:-top[j].y};
+    pushTri(c,t0,t1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ============================= THREE.JS SCENE ============================= */
+let renderer, scene, camPersp, camOrtho, controls, terrainMesh, buildingsGroup, details3dGroup, dirLight;
+let currentSceneRadius = 500;
+const canvasHost = document.getElementById('view3d');
+
+function initThree(){
+  if(renderer) return;
+  renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(state.style.background.color, 1);
+  canvasHost.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.fog = null;
+
+  const aspect = canvasHost.clientWidth / canvasHost.clientHeight;
+  camPersp = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000000);
+  camOrtho = new THREE.OrthographicCamera(-1000*aspect,1000*aspect,1000,-1000,0.1,10000000);
+
+  controls = new THREE.OrbitControls(activeCam(), renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 1;
+  controls.maxDistance = 100000000;
+  controls.target.set(0,0,0);
+  setCameraForRadius(currentSceneRadius, true);
+
+  // Unlit/color-only 3D: no directional light, no scene lighting falloff.
+  dirLight = null;
+
+  window.addEventListener('resize', onResize);
+  animate();
+}
+function setCameraForRadius(radius, resetPosition){
+  currentSceneRadius = Math.max(10, radius || 500);
+  if(!camPersp || !camOrtho) return;
+  const aspect = Math.max(0.1, canvasHost.clientWidth / Math.max(1, canvasHost.clientHeight));
+  const r = currentSceneRadius;
+  const far = Math.max(10000000, r * 100);
+  camPersp.far = far;
+  camPersp.aspect = aspect;
+  camPersp.updateProjectionMatrix();
+  const fsz = r * 1.15;
+  camOrtho.left=-fsz*aspect; camOrtho.right=fsz*aspect; camOrtho.top=fsz; camOrtho.bottom=-fsz;
+  camOrtho.far = far;
+  camOrtho.updateProjectionMatrix();
+  if(controls){
+    controls.maxDistance = Math.max(100000, r * 100);
+    controls.target.set(0,0,0);
+  }
+  if(resetPosition){
+    // Scale the initial camera distance with the map radius so large maps
+    // are not clipped by the near/far planes.
+    // Kamera im SÜDEN (+Z) mit Blick nach Norden (-Z): Norden oben, Osten rechts – identisch zu Karte & SVG.
+    camPersp.position.set(0, r*0.85, r*1.45);
+    camOrtho.position.set(0, r*0.85, r*1.45);
+    camPersp.lookAt(0,0,0);
+    camOrtho.lookAt(0,0,0);
+    if(controls){
+      controls.object = activeCam();
+      controls.update();
+    }
+  }
+}
+
+function activeCam(){ return state.view.projection==='ortho' ? camOrtho : camPersp; }
+function rebuildCamera(){
+  if(!renderer) return;
+  const old = controls.object;
+  const cam = activeCam();
+  cam.position.copy(old.position);
+  cam.quaternion.copy(old.quaternion);
+  controls.object = cam;
+  controls.target.set(0,0,0);
+  controls.maxDistance = Math.max(100000, currentSceneRadius * 100);
+  controls.update();
+}
+function onResize(){
+  if(!renderer) return;
+  const w = canvasHost.clientWidth, h = canvasHost.clientHeight;
+  renderer.setSize(w,h);
+  const aspect = w/h;
+  camPersp.aspect = aspect;
+  camPersp.updateProjectionMatrix();
+  const fsz = Math.max(10, currentSceneRadius * 1.15);
+  camOrtho.left=-fsz*aspect; camOrtho.right=fsz*aspect; camOrtho.top=fsz; camOrtho.bottom=-fsz;
+  camOrtho.updateProjectionMatrix();
+  camPersp.far = Math.max(10000000, currentSceneRadius * 100);
+  camPersp.updateProjectionMatrix();
+  camOrtho.far = Math.max(10000000, currentSceneRadius * 100);
+  camOrtho.updateProjectionMatrix();
+}
+function animate(){
+  requestAnimationFrame(animate);
+  if(controls) controls.update();
+  if(renderer) renderer.render(scene, activeCam());
+}
+let compassGroup = null;
+function clearSceneGroups(){
+  [buildingsGroup, details3dGroup, terrainMesh, compassGroup].forEach(g=>{ if(g) scene.remove(g); });
+  buildingsGroup = null; details3dGroup = null; terrainMesh = null; compassGroup = null;
+}
+function addCompass(radius){
+  // Weltkoordinaten: +X = Osten, -Z = Norden (wie Karte/SVG). Die Kompassnadel steht daher bei -Z.
+  const group = new THREE.Group();
+  group.name = 'Kompass';
+  const mat = new THREE.LineBasicMaterial({color:0x222222});
+  const pts = [new THREE.Vector3(0, 4, -radius*0.82), new THREE.Vector3(0, 4, -radius*0.96)];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  const sp = makeTextSprite('N', '#222222');
+  sp.position.set(0, 14, -radius*0.96);
+  group.add(sp);
+  scene.add(group);
+  compassGroup = group;
+  return group;
+}
+function makeTextSprite(text, color){
+  const cnv = document.createElement('canvas');
+  const ctx = cnv.getContext('2d');
+  cnv.width=256; cnv.height=64;
+  ctx.font = '48px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.82)';
+  ctx.fillRect(0,0,cnv.width,cnv.height);
+  ctx.fillStyle = color || '#e7e9ec';
+  ctx.textBaseline='middle'; ctx.textAlign='center';
+  ctx.fillText(text, cnv.width/2, cnv.height/2);
+  const tex = new THREE.CanvasTexture(cnv);
+  const mat = new THREE.SpriteMaterial({map:tex, depthTest:false});
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set(24,6,1);
+  return sp;
+}
+
+/* Render the generated SVG string to an offscreen canvas (used for the 3D ground texture and for PNG export) */
+function svgStringToCanvas(svgString, pxSize){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    const blob = new Blob([svgString], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    img.onload = ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width=pxSize; canvas.height=pxSize;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img,0,0,pxSize,pxSize);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('SVG-Rendering fehlgeschlagen')); };
+    img.src = url;
+  });
+}
+
+let terrainGridCache=null, terrainResCache=0, terrainCellSize=1, terrainBaseHeights=null;
+
+/* Höhenraster vorbereiten.
+   Die Höhen-API liefert Zeile 0 = SÜDEN (kleinste Breite). Das 3D-Mesh (PlaneGeometry) beginnt dagegen mit Zeile 0 = NORDEN (z = -Radius).
+   -> terrainGridCache   : Zeile 0 = Süd   (Höhenlinien / marchingSquares im SVG)
+   -> terrainBaseHeights : Zeile 0 = Nord  (3D-Mesh, heightAt, Vertical scale)
+   Muss VOR buildSVG() laufen, damit die Höhenlinien die aktuellen Daten nutzen. */
+function setTerrainGrids(elevData, radius){
+  const res = elevData.res;
+  terrainResCache = res;
+  terrainCellSize = (radius*2)/(res-1);
+  const minH = Math.min.apply(null, elevData.heights);
+  const geo = elevData.heights.map(h=>h-minH);
+  terrainGridCache = geo;
+  terrainBaseHeights = new Array(res*res);
+  for(let row=0; row<res; row++){
+    for(let col=0; col<res; col++){
+      terrainBaseHeights[row*res+col] = geo[(res-1-row)*res+col];
+    }
+  }
+}
+
+async function buildTerrain(elevData, radius, svgString){
+  const res = elevData.res;
+  const size = radius*2;
+
+  const geo = new THREE.PlaneGeometry(size, size, res-1, res-1);
+  geo.rotateX(-Math.PI/2);
+  const posAttr = geo.attributes.position;
+  for(let i=0;i<posAttr.count;i++){
+    posAttr.setY(i, terrainBaseHeights[i] * state.terrain.vscale);
+  }
+  // Einheitliche Orientierung für Karte, SVG, Boden-Textur und Gebäude:
+  //   +X = Osten, -Z = Norden.  Bildoberkante der Textur = Norden (z = -Radius), Bildlinks = Westen (x = -Radius).
+  const uvAttr = geo.attributes.uv;
+  for(let i=0;i<posAttr.count;i++){
+    const px = posAttr.getX(i), pz = posAttr.getZ(i);
+    uvAttr.setXY(i, (px+radius)/(2*radius), 1 - (pz+radius)/(2*radius));
+  }
+  uvAttr.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  let mat;
+  try{
+    const maxGpuTex = (renderer && renderer.capabilities && renderer.capabilities.maxTextureSize) ? renderer.capabilities.maxTextureSize : 16384;
+    const requestedTex = state.terrain.textureRes;
+    const effectiveTex = Math.min(requestedTex, maxGpuTex);
+    if(effectiveTex < requestedTex){
+      setStatus('3D-Textur: '+(requestedTex/1024)+'K gewählt · GPU begrenzt Vorschau auf '+Math.round(effectiveTex/1024)+'K.');
+    }
+    const canvas = await svgStringToCanvas(svgString, effectiveTex);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.flipY = true;   // Canvas-Oberkante (Norden) = v 1
+    tex.needsUpdate = true;
+    mat = new THREE.MeshBasicMaterial({map:tex, wireframe:state.view.wireframe});
+  } catch(err){
+    mat = new THREE.MeshBasicMaterial({color:0x68705f, wireframe:state.view.wireframe});
+  }
+  terrainMesh = new THREE.Mesh(geo, mat);
+  terrainMesh.name = 'Landmasse_Boden';
+  scene.add(terrainMesh);
+}
+
+// Höhe (unskaliert) an einer Weltposition; worldZ = -Norden. Raster: Zeile 0 = Nord.
+function heightAtRaw(worldX, worldZ, radius){
+  if(!terrainBaseHeights) return 0;
+  const res = terrainResCache;
+  const size = radius*2;
+  const gx = ((worldX+radius)/size)*(res-1);
+  const gz = ((worldZ+radius)/size)*(res-1);
+  const ix = Math.min(res-2, Math.max(0, Math.floor(gx)));
+  const iz = Math.min(res-2, Math.max(0, Math.floor(gz)));
+  const fx = Math.min(1, Math.max(0, gx-ix)), fz = Math.min(1, Math.max(0, gz-iz));
+  const h00=terrainBaseHeights[iz*res+ix], h10=terrainBaseHeights[iz*res+ix+1];
+  const h01=terrainBaseHeights[(iz+1)*res+ix], h11=terrainBaseHeights[(iz+1)*res+ix+1];
+  const h0 = h00*(1-fx)+h10*fx, h1=h01*(1-fx)+h11*fx;
+  return h0*(1-fz)+h1*fz;
+}
+
+
+/* ============================= DETAILLIERTE 3D-OBJEKTE ============================= */
+function tagNumber(tags, keys, fallback){
+  for(const k of keys){
+    if(tags && tags[k]!==undefined && tags[k]!=='' ){
+      const n=parseFloat(String(tags[k]).replace(',','.'));
+      if(Number.isFinite(n)) return n;
+    }
+  }
+  return fallback;
+}
+function wayWidth(tags, fallback){
+  return tagNumber(tags,['width','width:carriageway','est_width'],fallback);
+}
+function clipSegmentToSquare(a,b,radius){
+  const min=-radius, max=radius;
+  let t0=0, t1=1;
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const checks=[[-dx,a.x-min],[dx,max-a.x],[-dy,a.y-min],[dy,max-a.y]];
+  for(const [p,q] of checks){
+    if(Math.abs(p)<1e-12){ if(q<0) return null; continue; }
+    const t=q/p;
+    if(p<0){ if(t>t1) return null; if(t>t0) t0=t; }
+    else { if(t<t0) return null; if(t<t1) t1=t; }
+  }
+  return [{x:a.x+dx*t0,y:a.y+dy*t0},{x:a.x+dx*t1,y:a.y+dy*t1}];
+}
+function clipPolygonToSquare(points,radius){
+  let out=points.slice();
+  const edges=[
+    {inside:p=>p.x>=-radius, intersect:(a,b)=>{const t=(-radius-a.x)/(b.x-a.x);return {x:-radius,y:a.y+(b.y-a.y)*t};}},
+    {inside:p=>p.x<= radius, intersect:(a,b)=>{const t=( radius-a.x)/(b.x-a.x);return {x: radius,y:a.y+(b.y-a.y)*t};}},
+    {inside:p=>p.y>=-radius, intersect:(a,b)=>{const t=(-radius-a.y)/(b.y-a.y);return {x:a.x+(b.x-a.x)*t,y:-radius};}},
+    {inside:p=>p.y<= radius, intersect:(a,b)=>{const t=( radius-a.y)/(b.y-a.y);return {x:a.x+(b.x-a.x)*t,y: radius};}}
+  ];
+  for(const edge of edges){
+    if(!out.length) break;
+    const input=out; out=[];
+    for(let i=0;i<input.length;i++){
+      const a=input[i], b=input[(i+1)%input.length];
+      const ia=edge.inside(a), ib=edge.inside(b);
+      if(ia && ib) out.push(b);
+      else if(ia && !ib) out.push(edge.intersect(a,b));
+      else if(!ia && ib){ out.push(edge.intersect(a,b)); out.push(b); }
+    }
+  }
+  return out;
+}
+
+function addRibbonFromWay(group, w, width, yOffset, material, namePrefix){
+  const pts = projectAndSimplifyWay(w,false);
+  if(pts.length<2) return;
+  const positions=[];
+  const clipRadius = Math.max(0, currentSceneRadius - width*0.5);
+  for(let i=0;i<pts.length-1;i++){
+    const clipped = clipSegmentToSquare(pts[i],pts[i+1],clipRadius);
+    if(!clipped) continue;
+    const a=clipped[0], b=clipped[1];
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
+    const nx=-dy/len*width/2, ny=dx/len*width/2;
+    const base=state.terrain.enable ? heightAtRaw((a.x+b.x)/2,-(a.y+b.y)/2,currentSceneRadius)*state.terrain.vscale : 0;
+    const y=base+yOffset;
+    positions.push(
+      a.x,y,-a.y, a.x+nx,y,-(a.y+ny), b.x+nx,y,-(b.y+ny),
+      a.x,y,-a.y, b.x+nx,y,-(b.y+ny), b.x-nx,y,-(b.y-ny),
+      a.x,y,-a.y, b.x-nx,y,-(b.y-ny), a.x-nx,y,-(a.y-ny)
+    );
+  }
+  if(!positions.length) return;
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,material);
+  mesh.name=namePrefix+'_'+(group.children.length+1);
+  mesh.userData.exportCategory = namePrefix;
+  group.add(mesh);
+}
+function addBridgeSupport(group, x, y, z, h, radius, material, name){
+  const geo=new THREE.CylinderGeometry(radius,radius,h,10);
+  const mesh=new THREE.Mesh(geo,material);
+  mesh.position.set(x,y+h/2,z);
+  mesh.name=name;
+  mesh.userData.exportCategory = name;
+  group.add(mesh);
+}
+function bridgeHeightInfo(tags){
+  const t=tags||{};
+  // OSM: height is the absolute height to the top of the structure;
+  // min_height is the height above ground at the bottom of the structure.
+  const top=tagNumber(t,['height','bridge:height'],NaN);
+  const bottom=tagNumber(t,['min_height','bridge:min_height'],NaN);
+  let deck=Number.isFinite(bottom)?bottom:NaN;
+  let total=Number.isFinite(top)?top:NaN;
+  if(!Number.isFinite(total) && Number.isFinite(deck)) total=deck+3.0;
+  if(!Number.isFinite(deck)) deck=2.5;
+  if(!Number.isFinite(total)) total=deck+3.0;
+  if(total<=deck) total=deck+3.0;
+  return {bottom:deck,total,thickness:Math.max(0.5,total-deck)};
+}
+
+const DETAIL3D_GROUP_LABELS = {
+  bridges:'Brücken', bridgeSupports:'Brückenpfeiler', tunnels:'Tunnel',
+  roads:'Straßen (3D)', railway:'Bahn (3D)', trees:'Bäume', treeRows:'Baumreihen',
+  hedges:'Hecken', walls:'Mauern / Zäune', poles:'Masten', towers:'Türme / Antennen',
+  streetLamps:'Straßenlaternen', waterObjects:'Wasserbauwerke'
+};
+
+function build3DDetails(ways,nodes,radius){
+  const g=new THREE.Group();
+  g.name='3D_Details';
+  const mats={
+    bridge:new THREE.MeshBasicMaterial({color:0x8d8578,wireframe:state.view.wireframe}),
+    tunnel:new THREE.MeshBasicMaterial({color:0x4e4b47,wireframe:state.view.wireframe}),
+    road:new THREE.MeshBasicMaterial({color:0x77736d,wireframe:state.view.wireframe}),
+    rail:new THREE.MeshBasicMaterial({color:0x6f6b67,wireframe:state.view.wireframe}),
+    green:new THREE.MeshBasicMaterial({color:0x5d8155,wireframe:state.view.wireframe}),
+    wall:new THREE.MeshBasicMaterial({color:0x81796d,wireframe:state.view.wireframe}),
+    pole:new THREE.MeshBasicMaterial({color:0x5b5b59,wireframe:state.view.wireframe}),
+    water:new THREE.MeshBasicMaterial({color:0x4e9ca8,wireframe:state.view.wireframe})
+  };
+
+  // Eine Untergruppe pro 3D-Kategorie, damit jede einzeln ein-/ausblendbar ist
+  // (analog zum "Gebäude anzeigen"-Schalter) und der Export sauber gruppiert bleibt.
+  const cat={};
+  Object.keys(DETAIL3D_GROUP_LABELS).forEach(k=>{
+    const sub=new THREE.Group();
+    sub.name=DETAIL3D_GROUP_LABELS[k];
+    sub.visible = state.view.show3d[k]!==false;
+    cat[k]=sub;
+    g.add(sub);
+  });
+
+  if(state.details3d.bridges){
+    ways.filter(w=>w.tags && (w.tags.bridge || w.tags.man_made==='bridge' || w.tags.building==='bridge')).forEach((w,i)=>{
+      if(w.tags.man_made==='bridge' && w.rings){
+        const rings=w.rings.filter(r=>r.length>2);
+        rings.forEach((ring,j)=>{
+          const pts=clipPolygonToSquare(ring.map(p=>project(p.lat,p.lon)),radius);
+          if(pts.length<3) return;
+          const shape=new THREE.Shape(pts.map(p=>new THREE.Vector2(p.x,p.y)));
+          const bh=bridgeHeightInfo(w.tags);
+          const h=bh.total;
+          const minH=bh.bottom;
+          const depth=bh.thickness;
+          const geo=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
+          geo.rotateX(-Math.PI/2);
+          const mesh=new THREE.Mesh(geo,mats.bridge);
+          mesh.position.y=minH;
+          mesh.name='Brücke_Fläche_'+i+'_'+j;
+          mesh.userData.exportCategory='Brücke_Fläche';
+          cat.bridges.add(mesh);
+        });
+      } else {
+        const bh=bridgeHeightInfo(w.tags);
+        addRibbonFromWay(cat.bridges,w,wayWidth(w.tags,Math.max(4.5,tagNumber(w.tags,['lanes'],1)*3.1)),bh.total-0.25,mats.bridge,'Brücke');
+      }
+      if(state.details3d.bridgeSupports && w.geometry && w.geometry.length>=2){
+        const mid=w.geometry[Math.floor(w.geometry.length/2)];
+        const p=project(mid.lat,mid.lon);
+        if(Math.abs(p.x)>radius || Math.abs(p.y)>radius) return;
+        const bh=bridgeHeightInfo(w.tags);
+        const base=state.terrain.enable ? heightAtRaw(p.x,-p.y,radius)*state.terrain.vscale : 0;
+        const supportTop=Math.max(base+1,bh.bottom*state.terrain.vscale);
+        addBridgeSupport(cat.bridgeSupports,p.x,base,-p.y,Math.max(1,supportTop-base-0.15),0.65,mats.bridge,'Brückenpfeiler');
+      }
+    });
+  }
+
+  if(state.details3d.tunnels){
+    ways.filter(w=>w.tags && w.tags.tunnel).forEach(w=>{
+      addRibbonFromWay(cat.tunnels,w,wayWidth(w.tags,4),0.15,mats.tunnel,'Tunnel');
+    });
+  }
+  if(state.details3d.roads){
+    ways.filter(w=>w.tags && w.tags.highway && !w.tags.building).forEach(w=>{
+      addRibbonFromWay(cat.roads,w,wayWidth(w.tags,Math.max(2.5,tagNumber(w.tags,['lanes'],1)*3)),0.08,mats.road,'Straße');
+    });
+  }
+  if(state.details3d.railway){
+    ways.filter(w=>w.tags && w.tags.railway).forEach(w=>{
+      addRibbonFromWay(cat.railway,w,wayWidth(w.tags,2.4),0.12,mats.rail,'Bahn');
+    });
+  }
+
+  if(state.details3d.hedges || state.details3d.walls){
+    ways.filter(w=>w.tags && (
+      (state.details3d.hedges && w.tags.barrier==='hedge') ||
+      (state.details3d.walls && ['wall','fence','retaining_wall','city_wall'].includes(w.tags.barrier))
+    )).forEach((w,i)=>{
+      const barrier=w.tags.barrier;
+      const width=barrier==='fence'?0.10:0.25;
+      const height=tagNumber(w.tags,['height'],barrier==='fence'?1.5:1.8);
+      const mat=barrier==='hedge'?mats.green:mats.wall;
+      const isHedge=barrier==='hedge';
+      addRibbonFromWay(isHedge?cat.hedges:cat.walls,w,width,height/2,mat,isHedge?'Hecke':'Mauer');
+      // schmale vertikale Stützen bei Zäunen
+      if(barrier==='fence'){
+        w.geometry.forEach((p,j)=>{
+          if(j%2!==0) return;
+          const q=project(p.lat,p.lon);
+          const base=state.terrain.enable ? heightAtRaw(q.x,-q.y,radius)*state.terrain.vscale : 0;
+          addBridgeSupport(cat.walls,q.x,base,-q.y,height,0.035,mat,'Zaunpfosten');
+        });
+      }
+    });
+  }
+
+  if(state.details3d.trees){
+    nodes.filter(n=>n.tags && n.tags.natural==='tree').forEach((n,i)=>{
+      const p=project(n.lat,n.lon);
+      if(Math.abs(p.x)>radius || Math.abs(p.y)>radius) return;
+      const base=state.terrain.enable ? heightAtRaw(p.x,-p.y,radius)*state.terrain.vscale : 0;
+      const treeH=tagNumber(n.tags,['height','tree:height'],8);
+      const crownD=tagNumber(n.tags,['diameter_crown'],Math.max(2.5,treeH*0.38));
+      const trunkH=Math.max(1.8,treeH*0.42);
+      const crownH=Math.max(1.5,treeH-trunkH);
+      const trunkGeo=new THREE.CylinderGeometry(Math.max(0.06,crownD*0.04),Math.max(0.09,crownD*0.055),trunkH,7);
+      const trunkMesh=new THREE.Mesh(trunkGeo,mats.wall);
+      trunkMesh.position.set(p.x,base+trunkH/2,-p.y);
+      trunkMesh.name='Baumstamm_'+(i+1);
+      trunkMesh.userData.exportCategory='Bäume';
+      cat.trees.add(trunkMesh);
+      const crownGeo=new THREE.SphereGeometry(1,8,6);
+      const crown=new THREE.Mesh(crownGeo,mats.green);
+      crown.scale.set(crownD/2,crownH/2,crownD/2);
+      crown.position.set(p.x,base+trunkH+crownH/2-0.15,-p.y);
+      crown.name='Baum_'+(i+1);
+      crown.userData.exportCategory='Bäume';
+      cat.trees.add(crown);
+    });
+  }
+  if(state.details3d.treeRows){
+    ways.filter(w=>w.tags && w.tags.natural==='tree_row').forEach(w=>{
+      addRibbonFromWay(cat.treeRows,w,0.7,0.4,mats.green,'Baumreihe');
+    });
+  }
+
+  if(state.details3d.poles || state.details3d.towers || state.details3d.streetLamps){
+    nodes.filter(n=>n.tags).forEach((n,i)=>{
+      const t=n.tags;
+      const isPole=state.details3d.poles && (t.power==='pole' || t.power==='tower');
+      const isTower=state.details3d.towers && (t.man_made==='tower' || t.man_made==='mast' || t.man_made==='communications_tower');
+      const isLamp=state.details3d.streetLamps && t.highway==='street_lamp';
+      if(!isPole && !isTower && !isLamp) return;
+      const p=project(n.lat,n.lon);
+      if(Math.abs(p.x)>radius || Math.abs(p.y)>radius) return;
+      const base=state.terrain.enable ? heightAtRaw(p.x,-p.y,radius)*state.terrain.vscale : 0;
+      const h=tagNumber(t,['height','tower:height'],isLamp?5:(isTower?25:9));
+      const r=isTower?0.45:(isLamp?0.08:0.16);
+      const geo=new THREE.CylinderGeometry(r,r,h,8);
+      const mesh=new THREE.Mesh(geo,isTower?mats.pole:(isLamp?mats.wall:mats.pole));
+      mesh.position.set(p.x,base+h/2,-p.y);
+      const targetCat=isLamp?cat.streetLamps:(isTower?cat.towers:cat.poles);
+      mesh.name=isLamp?'Straßenlaterne_'+i:(isTower?'Turm_'+i:'Mast_'+i);
+      mesh.userData.exportCategory=isLamp?'Straßenlaterne':(isTower?'Turm':'Mast');
+      targetCat.add(mesh);
+    });
+  }
+
+  if(state.details3d.waterObjects){
+    ways.filter(w=>w.tags && ['pier','breakwater','dam','water_tower'].includes(w.tags.man_made)).forEach(w=>{
+      addRibbonFromWay(cat.waterObjects,w,wayWidth(w.tags,2),0.15,mats.water,'Wasserbauwerk');
+    });
+  }
+
+  scene.add(g);
+  details3dGroup = g;
+  return g;
+}
+
+function buildBuildings(ways, radius){
+  buildingsGroup = new THREE.Group();
+  buildingsGroup.name = 'Gebaeude';
+  buildingsGroup.visible = state.view.showBuildings3d;
+  if(!state.buildingsCfg.enable){ scene.add(buildingsGroup); return; }
+  const mat = new THREE.MeshBasicMaterial({color:state.style.buildings.color, wireframe:state.view.wireframe});
+  const roofMat = new THREE.MeshBasicMaterial({color:state.style.roof.color, wireframe:state.view.wireframe, side:THREE.DoubleSide});
+
+  ways.filter(w=>w.tags && w.tags.building && !w.rings).forEach((w,idx)=>{
+    let pts2d = projectAndSimplifyWay(w, true);
+    if(pts2d.length<3) return;
+    pts2d = clipPolygonToSquare(pts2d, radius);
+    if(pts2d.length<3) return;
+    pts2d = insetPolygon(pts2d, state.buildingsCfg.gap);
+    if(pts2d.length<3) return;
+    // project(): +X = Osten, +Y = Norden. Shape (x,y) wird um -90° um X gedreht -> Welt (x, hoch, -y):
+    // exakt dieselbe Konvention wie Boden-Mesh und SVG-Textur (Norden = -Z).
+    const shape = new THREE.Shape(pts2d.map(p=>new THREE.Vector2(p.x, p.y)));
+
+    const h = Math.min(250, Math.max(2.5, wayHeightMeters(w.tags||{})));
+    const centroid = pts2d.reduce((a,p)=>({x:a.x+p.x/pts2d.length, y:a.y+p.y/pts2d.length}), {x:0,y:0});
+    const baseRaw = state.terrain.enable ? heightAtRaw(centroid.x, -centroid.y, radius) : 0;
+    const extrude = new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:false});
+    extrude.rotateX(-Math.PI/2);
+    const mesh = new THREE.Mesh(extrude, mat);
+    mesh.name = 'Haus_'+(idx+1);
+    mesh.position.y = baseRaw * state.terrain.vscale;
+    mesh.userData.baseRaw = baseRaw;
+    buildingsGroup.add(mesh);
+
+    if(state.buildingsCfg.roofs){
+      const footprintArea = shapeArea(pts2d);
+      const roofH = Math.min(6, Math.max(1.2, Math.sqrt(footprintArea)*0.22));
+      const roofGeo = buildHipRoofGeometry(pts2d, h, roofH, 0.55);
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.name = 'Haus_'+(idx+1)+'_Dach';
+      roof.position.y = baseRaw * state.terrain.vscale;
+      roof.userData.baseRaw = baseRaw;
+      buildingsGroup.add(roof);
+    }
+  });
+  scene.add(buildingsGroup);
+}
+
+function applyVerticalScale(){
+  if(!terrainMesh || !terrainBaseHeights) return;
+  const geo = terrainMesh.geometry;
+  const posAttr = geo.attributes.position;
+  for(let i=0;i<posAttr.count;i++) posAttr.setY(i, terrainBaseHeights[i]*state.terrain.vscale);
+  posAttr.needsUpdate = true;
+  geo.computeVertexNormals();
+  // Gebäude mitführen, damit sie nicht über/unter dem Gelände schweben
+  if(buildingsGroup) buildingsGroup.children.forEach(m=>{
+    if(m.userData && m.userData.baseRaw!==undefined) m.position.y = m.userData.baseRaw*state.terrain.vscale;
+  });
+}
+// Ground level: verschiebt Boden + Gebäude gemeinsam in der Höhe (m). Standard 0.
+function applyGroundLevel(){
+  const y = state.terrain.baseHeight || 0;
+  if(terrainMesh) terrainMesh.position.y = y;
+  if(buildingsGroup) buildingsGroup.position.y = y;
+}
+function applyWireframe(){
+  [terrainMesh, buildingsGroup, details3dGroup].forEach(g=>{
+    if(!g) return;
+    g.traverse(o=>{ if(o.material) o.material.wireframe = state.view.wireframe; });
+  });
+}
+/* ============================= ALKIS NRW: Flurstücke (amtliche Grundstücksdaten) ============================= */
+// ETRS89 / UTM 32N (EPSG:25832) <-> WGS84 (Krüger-Reihen, Genauigkeit im Millimeterbereich)
+const UTM = (function(){
+  const a = 6378137, f = 1/298.257222101, k0 = 0.9996, E0 = 500000, lon0 = 9*Math.PI/180;
+  const n = f/(2-f), n2 = n*n, n3 = n2*n;
+  const A = a/(1+n)*(1 + n2/4 + n2*n2/64);
+  const al = [n/2 - 2*n2/3 + 5*n3/16, 13*n2/48 - 3*n3/5, 61*n3/240];
+  const be = [n/2 - 2*n2/3 + 37*n3/96, n2/48 + n3/15, 17*n3/480];
+  const de = [2*n - 2*n2/3 - 2*n3, 7*n2/3 - 8*n3/5, 56*n3/15];
+  const c = 2*Math.sqrt(n)/(1+n);
+  return {
+    fwd(lat, lon){
+      const phi = lat*Math.PI/180, lam = lon*Math.PI/180 - lon0, sp = Math.sin(phi);
+      const t = Math.sinh(Math.atanh(sp) - c*Math.atanh(c*sp));
+      const xi = Math.atan2(t, Math.cos(lam));
+      const eta = Math.atanh(Math.sin(lam)/Math.sqrt(1+t*t));
+      let E = eta, N = xi;
+      for(let j=1;j<=3;j++){
+        E += al[j-1]*Math.cos(2*j*xi)*Math.sinh(2*j*eta);
+        N += al[j-1]*Math.sin(2*j*xi)*Math.cosh(2*j*eta);
+      }
+      return {e: E0 + k0*A*E, n: k0*A*N};
+    },
+    inv(e, nn){
+      const xi = nn/(k0*A), eta = (e-E0)/(k0*A);
+      let xi1 = xi, eta1 = eta;
+      for(let j=1;j<=3;j++){
+        xi1  -= be[j-1]*Math.sin(2*j*xi)*Math.cosh(2*j*eta);
+        eta1 -= be[j-1]*Math.cos(2*j*xi)*Math.sinh(2*j*eta);
+      }
+      const chi = Math.asin(Math.sin(xi1)/Math.cosh(eta1));
+      let phi = chi;
+      for(let j=1;j<=3;j++) phi += de[j-1]*Math.sin(2*j*chi);
+      const lam = lon0 + Math.atan2(Math.sinh(eta1), Math.cos(xi1));
+      return {lat: phi*180/Math.PI, lon: lam*180/Math.PI};
+    }
+  };
+})();
+
+const ALKIS_WFS = 'https://www.wfs.nrw.de/geobasis/wfs_nw_alkis_vereinfacht';
+async function fetchAlkisParcels(lat, lon, radius){
+  const half = radius*1.25;                       // Quadrat + Reserve (UTM-Gitter ist gegenüber Nord leicht gedreht)
+  const c = UTM.fwd(lat, lon);
+  const srs = 'urn:ogc:def:crs:EPSG::25832';
+  const COUNT = 8000;
+  const bbox = [c.e-half, c.n-half, c.e+half, c.n+half].map(v=>v.toFixed(1)).join(',');
+  const url = ALKIS_WFS+'?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=ave:Flurstueck'
+    +'&SRSNAME='+srs+'&COUNT='+COUNT+'&BBOX='+bbox+','+srs
+    +'&OUTPUTFORMAT='+encodeURIComponent('application/gml+xml; version=3.2');
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const text = await res.text();
+  const xml = new DOMParser().parseFromString(text, 'application/xml');
+  if(xml.getElementsByTagName('parsererror').length) throw new Error('Antwort nicht lesbar');
+  const exc = xml.getElementsByTagNameNS('*','ExceptionText')[0];
+  if(exc) throw new Error(exc.textContent.trim().slice(0,160));
+
+  const feats = Array.from(xml.getElementsByTagNameNS('*','Flurstueck'));
+  const txtOf = (f, ln)=>{
+    const el = Array.from(f.getElementsByTagName('*')).find(e=>e.localName.toLowerCase()===ln);
+    return el ? el.textContent.trim() : '';
+  };
+  const out = feats.map(f=>{
+    const rings = Array.from(f.getElementsByTagNameNS('*','posList')).map(pl=>{
+      const nums = pl.textContent.trim().split(/\s+/).map(Number);
+      const dim = parseInt(pl.getAttribute('srsDimension')||'2',10) || 2;
+      const swap = nums[0] > 1e6;                  // falls Nord/Ost vertauscht geliefert wird
+      const ring = [];
+      for(let i=0;i+1<nums.length;i+=dim){
+        ring.push(swap ? UTM.inv(nums[i+1], nums[i]) : UTM.inv(nums[i], nums[i+1]));
+      }
+      return ring;
+    }).filter(r=>r.length>2);
+    const z = txtOf(f,'zaehler'), nn = txtOf(f,'nenner');
+    return {rings, label: z ? (nn ? z+'/'+nn : z) : ''};
+  }).filter(p=>p.rings.length);
+  if(feats.length>=COUNT) console.warn('ALKIS: Abfragelimit ('+COUNT+') erreicht – Radius verkleinern für vollständige Flurstücke.');
+  return out;
+}
+
+/* ============================= GENERATE PIPELINE ============================= */
+const genBtn = document.getElementById('genBtn');
+genBtn.addEventListener('click', runGenerate);
+let lastSvgUrl = null;
+let lastSvgString = null;
+
+async function runGenerate(){
+  genBtn.disabled = true;
+  setStatus('Lade Kartendaten (Overpass)…');
+  originLat = state.lat; originLon = state.lon;
+  try{
+    const elements = await fetchOverpass(state.lat, state.lon, state.radius);
+    const {ways, nodes} = classifyWays(elements);
+
+    let elevData = null;
+    if(state.terrain.enable){
+      setStatus('Lade Höhendaten ('+state.terrain.res+'×'+state.terrain.res+')…');
+      elevData = await fetchElevationGrid(state.lat, state.lon, state.radius, state.terrain.res);
+    } else {
+      const res = 8;
+      elevData = {res, heights: new Array(res*res).fill(0)};
+    }
+    // Höhenraster VOR dem SVG setzen, damit Höhenlinien die aktuellen Daten nutzen
+    setTerrainGrids(elevData, state.radius);
+
+    // Grundstücke
+    let parcels = [], parcelNote = '';
+    if(state.parcels.enable){
+      if(state.parcels.source==='alkis'){
+        try{
+          setStatus('Lade Flurstücke (ALKIS NRW)…');
+          parcels = await fetchAlkisParcels(state.lat, state.lon, state.radius);
+          if(!parcels.length) parcelNote = ' · Keine ALKIS-Flurstücke gefunden (Standort außerhalb NRW?)';
+        } catch(err){
+          parcelNote = ' · Flurstücke (ALKIS) nicht ladbar: '+err.message+' – Quelle „OpenStreetMap“ probieren';
+        }
+      } else {
+        parcels = ways.filter(w=>w.tags && (w.tags.place==='plot' || w.tags.boundary==='lot'))
+                      .map(w=>({rings: w.rings || [w.geometry], label:''}));
+        if(!parcels.length) parcelNote = ' · Keine OSM-Grundstücke (place=plot) im Bereich';
+      }
+    }
+
+    state.data = {ways, nodes, elevData, parcels};
+
+    setStatus('Baue Karten-Textur (SVG)…');
+    const svgString = buildSVG(state.data, state.radius);
+    lastSvgString = svgString;
+
+    // update SVG top-view tab
+    if(lastSvgUrl) URL.revokeObjectURL(lastSvgUrl);
+    lastSvgUrl = URL.createObjectURL(new Blob([svgString], {type:'image/svg+xml'}));
+    document.getElementById('svgPreviewImg').src = lastSvgUrl;
+
+    setStatus('Baue 3D-Szene…');
+    initThree();
+    setCameraForRadius(state.radius, true);
+    clearSceneGroups();
+
+    await buildTerrain(elevData, state.radius, svgString);
+    buildBuildings(ways, state.radius);
+    build3DDetails(ways, nodes, state.radius);
+    addCompass(state.radius);
+
+    applyWireframe();
+    applyGroundLevel();
+
+    state.built = true;
+    document.getElementById('empty3dMsg').style.display='none';
+    document.getElementById('toolbar3d').style.display='flex';
+    ['expSvg','expPng','expGlb','expObj'].forEach(id=>document.getElementById(id).disabled=false);
+
+    activateTab('3d');
+    setStatus('Fertig: '+ways.length+' Wege/Flächen, '+nodes.length+' Punkte'+(state.parcels.enable?', '+parcels.length+' Grundstücke':'')+' geladen.'+parcelNote, parcelNote ? undefined : 'ok');
+  } catch(err){
+    console.error(err);
+    const isFileProtocol = location.protocol === 'file:';
+    setStatus('Fehler: '+err.message+(isFileProtocol ? ' — läuft die Seite über file://? Dann per lokalem Server (http://localhost) öffnen.' : ''), 'err');
+  } finally {
+    genBtn.disabled = false;
+  }
+}
+
+/* ============================= SVG GENERATION (grouped by category, styled) ============================= */
+function dashArrayFor(dash, width){
+  const w = Math.max(0.3, width);
+  if(dash==='dashed') return (w*4).toFixed(2)+','+(w*2.2).toFixed(2);
+  if(dash==='dotted') return (w*0.9).toFixed(2)+','+(w*1.6).toFixed(2);
+  return null;
+}
+const TAGTEST = {
+  parks:    t=>['park','recreation_ground','village_green','common','garden','nature_reserve','golf_course','dog_park','pitch'].includes(t.leisure) || ['recreation_ground','village_green'].includes(t.landuse),
+  forests:  t=>t.landuse==='forest' || t.natural==='wood',
+  meadows:  t=>['meadow','grass','allotments','greenfield','conservation'].includes(t.landuse) || ['grass','grassland','heath','moor','shrubbery'].includes(t.natural) || ['garden','common'].includes(t.leisure),
+  farmland: t=>['farmland','orchard','vineyard'].includes(t.landuse),
+  scrub:    t=>['scrub','fell'].includes(t.natural),
+  wetlands: t=>t.natural==='wetland',
+  water:    t=>t.natural==='water'
+};
+function buildSVG(data, radius, exportOverflow=false){
+  const size = 1000;
+  // Normal SVG is the exact map/terrain square. Export SVG uses the complete
+  // geometry of features that reach into the selected radius, so cut-off lakes,
+  // forests etc. are not artificially chopped at the edge.
+  let extent = radius;
+  if(exportOverflow){
+    data.ways.forEach(w=>{
+      const pts = w.geometry || [];
+      let touchesRadius = false;
+      for(const g of pts){
+        const p = project(g.lat,g.lon);
+        if(Math.hypot(p.x,p.y) <= radius){ touchesRadius = true; break; }
+      }
+      if(touchesRadius){
+        pts.forEach(g=>{
+          const p = project(g.lat,g.lon);
+          extent = Math.max(extent, Math.abs(p.x), Math.abs(p.y));
+        });
+      }
+    });
+    extent = Math.max(extent, radius);
+  }
+  const worldSize = extent*2;
+  const scale = size/worldSize;
+  const cx = size/2, cy = size/2;
+  const toSvg = (lat,lon)=>{ const p=project(lat,lon); return {x: cx+p.x*scale, y: cy - p.y*scale}; };
+  const S = state.style;
+  const parts = [];
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" font-family="JetBrains Mono, monospace">`);
+  parts.push(`<rect x="0" y="0" width="${size}" height="${size}" fill="${S.background.color}"/>`);
+
+  function pathFor(pts2dMeters){
+    return pts2dMeters.map((p,i)=>{ const sx=cx+p.x*scale, sy=cy-p.y*scale; return (i===0?'M':'L')+sx.toFixed(2)+','+sy.toFixed(2); }).join(' ');
+  }
+  function wayPts(w, closed){ return projectAndSimplifyWay(w, closed); }
+  // Fläche = Way ODER Multipolygon (mehrere Ringe, evenodd -> Löcher)
+  function ringsD(w){
+    const rings = w.rings || [w.geometry];
+    return rings.map(r=>{
+      const pts = wayPts({geometry:r}, true);
+      return pts.length>1 ? pathFor(pts)+' Z' : '';
+    }).filter(Boolean).join(' ');
+  }
+  function areaGroup(id, list, color, opacity){
+    parts.push(`<g id="${id}">`);
+    list.forEach(w=>{
+      const d = ringsD(w);
+      if(d) parts.push(`<path d="${d}" fill="${color}" fill-opacity="${opacity}" fill-rule="evenodd" stroke="none"/>`);
+    });
+    parts.push('</g>');
+  }
+  function lineGroup(id, list, color, width, dash){
+    const da = dashArrayFor(dash, width);
+    parts.push(`<g id="${id}">`);
+    list.forEach(w=>{
+      parts.push(`<path d="${pathFor(wayPts(w,false))}" fill="none" stroke="${color}" stroke-width="${width}"${da?` stroke-dasharray="${da}"`:''}/>`);
+    });
+    parts.push('</g>');
+  }
+  const withTags = fn => data.ways.filter(w=>w.tags && fn(w.tags));
+  const extraOn = group => EXTRA_LAYERS.filter(d=>d.group===group && state.extra[d.id].enabled);
+  function drawExtraAreas(group){
+    extraOn(group).filter(d=>d.kind==='area').forEach(d=>{
+      const x = state.extra[d.id];
+      areaGroup('x_'+d.id, withTags(d.test), x.color, x.opacity);
+    });
+  }
+
+  /* --- 1. Bodenflächen (Reiter „Bodenflächen“): ganz unten --- */
+  drawExtraAreas('ground');
+
+  /* --- 2. Grünflächen --- */
+  if(state.layers.parks)    areaGroup('parks',    withTags(TAGTEST.parks),    S.parks.color,    S.parks.opacity);
+  if(state.layers.forests)  areaGroup('forests',  withTags(TAGTEST.forests),  S.forests.color,  S.forests.opacity);
+  if(state.layers.meadows)  areaGroup('meadows',  withTags(TAGTEST.meadows),  S.meadows.color,  S.meadows.opacity);
+  if(state.layers.farmland) areaGroup('farmland', withTags(TAGTEST.farmland), S.farmland.color, S.farmland.opacity);
+  if(state.layers.scrub)    areaGroup('scrub',    withTags(TAGTEST.scrub),    S.scrub.color,    S.scrub.opacity);
+  if(state.layers.wetlands) areaGroup('wetlands', withTags(TAGTEST.wetlands), S.wetlands.color, S.wetlands.opacity);
+  drawExtraAreas('green');   // Reiter „Weitere Grünflächen“ (Friedhöfe, Spielplätze, Sport, Beete …)
+
+  /* --- 3. Wasser --- */
+  if(state.layers.water){
+    areaGroup('water', withTags(TAGTEST.water), S.water.color, S.water.opacity);
+    lineGroup('waterways', withTags(t=>t.waterway), S.waterlines.color, S.waterlines.width, S.waterlines.dash);
+  }
+
+  /* --- 4. Grundstücke (Reiter „Grundstücke“) --- */
+  if(state.parcels.enable && data.parcels && data.parcels.length){
+    const P = S.parcels;
+    const da = dashArrayFor(P.dash, P.width);
+    parts.push('<g id="parcels">');
+    data.parcels.forEach(pc=>{
+      const d = pc.rings.map(r=>{
+        const pts = wayPts({geometry:r}, true);
+        return pts.length>1 ? pathFor(pts)+' Z' : '';
+      }).filter(Boolean).join(' ');
+      if(!d) return;
+      parts.push(`<path d="${d}" fill="${P.fill}" fill-opacity="${P.fillOpacity}" fill-rule="evenodd" stroke="${P.color}" stroke-width="${P.width}" stroke-linejoin="round"${da?` stroke-dasharray="${da}"`:''}/>`);
+    });
+    if(state.parcels.labels){
+      parts.push(`<g id="parcel_labels" font-size="4.2" fill="${P.color}" text-anchor="middle">`);
+      data.parcels.forEach(pc=>{
+        if(!pc.label) return;
+        const ring = pc.rings[0];
+        let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+        ring.forEach(g=>{ const p=project(g.lat,g.lon); minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); });
+        const mx=(minX+maxX)/2, my=(minY+maxY)/2;
+        if(Math.abs(mx)>extent || Math.abs(my)>extent) return;
+        if((maxX-minX)*scale < 9 || (maxY-minY)*scale < 6) return;   // zu klein für Beschriftung
+        parts.push(`<text x="${(cx+mx*scale).toFixed(2)}" y="${(cy-my*scale+1.5).toFixed(2)}">${escapeXml(pc.label)}</text>`);
+      });
+      parts.push('</g>');
+    }
+    parts.push('</g>');
+  }
+
+  /* --- 5. Höhenlinien --- */
+  if(state.terrain.enable && terrainGridCache){
+    parts.push('<g id="contours">');
+    const res = terrainResCache, cellSize = terrainCellSize;
+    const lines = marchingSquares(terrainGridCache, res, cellSize, 0, state.terrain.interval);
+    const half = (res-1)*cellSize/2;
+    lines.forEach(L=>{
+      L.segs.forEach(seg=>{
+        const a = toSvg(originLat + (seg.a.y-half)/110540, originLon + (seg.a.x-half)/(111320*Math.cos(originLat*Math.PI/180)));
+        const b = toSvg(originLat + (seg.b.y-half)/110540, originLon + (seg.b.x-half)/(111320*Math.cos(originLat*Math.PI/180)));
+        parts.push(`<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="${S.contour.color}" stroke-width="0.6" stroke-opacity="0.8"/>`);
+      });
+    });
+    parts.push('</g>');
+  }
+
+  /* --- 6. Linien: Straßen, Bahn, Grenzen, Zäune, Hecken, Baumreihen --- */
+  if(state.layers.streets)  lineGroup('streets',  withTags(t=>t.highway),  S.streets.color,  S.streets.width,  S.streets.dash);
+  if(state.layers.railway)  lineGroup('railways', withTags(t=>t.railway),  S.railway.color,  S.railway.width,  S.railway.dash);
+  if(state.layers.borders)  lineGroup('borders',  withTags(t=>t.boundary==='administrative'), S.borders.color, S.borders.width, S.borders.dash);
+  if(state.parcels.fences)  lineGroup('fences',   withTags(t=>['fence','wall','retaining_wall','city_wall'].includes(t.barrier)), S.fences.color, S.fences.width, 'solid');
+  extraOn('green').filter(d=>d.kind==='line').forEach(d=>{
+    const x = state.extra[d.id];
+    const da = d.dotted ? dashArrayFor('dotted', d.width) : null;
+    parts.push(`<g id="x_${d.id}">`);
+    withTags(d.test).forEach(w=>{
+      const pts = wayPts(w,false);
+      if(pts.length>1) parts.push(`<path d="${pathFor(pts)}" fill="none" stroke="${x.color}" stroke-opacity="${x.opacity}" stroke-width="${d.width}" stroke-linecap="round" stroke-linejoin="round"${da?` stroke-dasharray="${da}"`:''}/>`);
+    });
+    parts.push('</g>');
+  });
+
+  /* --- 7. Punkte: Einzelbäume --- */
+  extraOn('green').filter(d=>d.kind==='point').forEach(d=>{
+    const x = state.extra[d.id];
+    parts.push(`<g id="x_${d.id}">`);
+    data.nodes.filter(n=>n.tags && d.test(n.tags)).forEach(n=>{
+      const p = toSvg(n.lat,n.lon);
+      if(p.x<-20 || p.x>size+20 || p.y<-20 || p.y>size+20) return;
+      const crown = parseFloat(n.tags.diameter_crown);
+      const rM = ((isFinite(crown) && crown>0) ? crown : 5)/2;
+      parts.push(`<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${Math.max(0.8, rM*scale).toFixed(2)}" fill="${x.color}" fill-opacity="${x.opacity}"/>`);
+    });
+    parts.push('</g>');
+  });
+
+  /* --- 8. Zusätzliche Bauwerke / 3D-Details auch in der SVG-Top-View ---
+     Bestehende SVG-Layer bleiben vollständig erhalten. Die neuen Objekte werden
+     zusätzlich und vektor-native gezeichnet, sofern der jeweilige 3D-Schalter aktiv ist. */
+  const D3 = state.details3d;
+  const detailLine = (id, list, color, width, dash, opacity=1)=>{
+    const da=dashArrayFor(dash,width);
+    parts.push(`<g id="${id}">`);
+    list.forEach(w=>{
+      const pts=wayPts(w,false);
+      if(pts.length>1) parts.push(`<path d="${pathFor(pts)}" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"${da?` stroke-dasharray="${da}"`:''}/>`);
+    });
+    parts.push('</g>');
+  };
+  if(D3.bridges){
+    const bridges=withTags(t=>!!t.bridge || t.man_made==='bridge' || t.building==='bridge');
+    parts.push('<g id="details_bridges">');
+    bridges.forEach(w=>{
+      const pts=wayPts(w,false);
+      if(pts.length<2) return;
+      const d=pathFor(pts);
+      parts.push(`<path d="${d}" fill="none" stroke="#554b43" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`);
+      parts.push(`<path d="${d}" fill="none" stroke="#b9aea0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`);
+      parts.push(`<path d="${d}" fill="none" stroke="#6f665d" stroke-width="0.55" stroke-linecap="round"/>`);
+      if(D3.bridgeSupports){
+        const mid=pts[Math.floor(pts.length/2)];
+        if(mid){ const x=cx+mid.x*scale, y=cy-mid.y*scale; parts.push(`<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="#756b61"/><circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.1" fill="#c8beb1"/>`); }
+      }
+    });
+    parts.push('</g>');
+  }
+  if(D3.tunnels) detailLine('details_tunnels', withTags(t=>!!t.tunnel || t.tunnel==='yes'), '#4d4d4d', 2.4, 'dashed', 0.9);
+  if(D3.roads) detailLine('details_roads3d', withTags(t=>!!t.highway && !t.bridge && !t.tunnel), '#8c857c', 2.2, 'solid', 0.55);
+  if(D3.railway) detailLine('details_railway3d', withTags(t=>!!t.railway), '#5b5550', 2.2, 'solid', 0.7);
+  if(D3.hedges) detailLine('details_hedges3d', withTags(t=>t.barrier==='hedge'), '#476f42', 1.5, 'dotted', 0.9);
+  if(D3.walls) detailLine('details_walls3d', withTags(t=>['wall','fence','retaining_wall','city_wall'].includes(t.barrier)), '#6e675f', 1.1, 'solid', 0.9);
+  if(D3.treeRows) detailLine('details_tree_rows3d', withTags(t=>t.natural==='tree_row'), '#477844', 1.8, 'dotted', 0.85);
+  if(D3.waterObjects){
+    detailLine('details_waterworks', withTags(t=>['pier','breakwater','dam'].includes(t.man_made) || ['pier','breakwater','dam'].includes(t.waterway)), '#477b86', 1.8, 'solid', 0.9);
+  }
+  if(D3.trees || D3.poles || D3.towers || D3.streetLamps){
+    parts.push('<g id="details_points3d">');
+    data.nodes.forEach(n=>{
+      const t=n.tags||{}; const p=toSvg(n.lat,n.lon);
+      let color=null, r=1.4, shape='circle';
+      if(D3.trees && t.natural==='tree'){ color='#3f7040'; r=2.2; }
+      else if(D3.poles && (t.power==='pole' || t.power==='minor_line')){ color='#5d5d5d'; r=1.1; }
+      else if(D3.towers && (t.power==='tower' || t.man_made==='tower' || t.man_made==='mast')){ color='#4d4a47'; r=1.7; }
+      else if(D3.streetLamps && t.highway==='street_lamp'){ color='#353535'; r=1.0; }
+      if(!color) return;
+      parts.push(`<${shape} cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${r}" fill="${color}"/>`);
+    });
+    parts.push('</g>');
+  }
+
+  /* --- 9. Gebäude --- */
+  if(state.layers.buildings){
+    parts.push('<g id="buildings">');
+    withTags(t=>t.building).forEach(w=>{
+      const d = ringsD(w);
+      if(d) parts.push(`<path d="${d}" fill="${S.buildings.color}" fill-opacity="0.95" fill-rule="evenodd" stroke="${S.buildings.stroke}" stroke-width="0.4"/>`);
+    });
+    parts.push('</g>');
+  }
+
+  /* --- 10. Beschriftungen --- */
+  if(state.labels.cities || state.labels.poi){
+    parts.push('<g id="labels">');
+    data.nodes.forEach(n=>{
+      const tags=n.tags||{};
+      let text=null, color='#e7e9ec';
+      if(state.labels.cities && tags.place && tags.name){text=tags.name;}
+      else if(state.labels.poi && (tags.amenity||tags.shop) && tags.name){text=tags.name; color=S.borders.color;}
+      if(!text) return;
+      const p = toSvg(n.lat,n.lon);
+      parts.push(`<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.4" fill="${color}"/>`);
+      parts.push(`<text x="${(p.x+3).toFixed(2)}" y="${p.y.toFixed(2)}" font-size="8" fill="${color}">${escapeXml(text)}</text>`);
+    });
+    parts.push('</g>');
+  }
+  parts.push('</svg>');
+  return parts.join('\n');
+}
+function escapeXml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ============================= EXPORTS ============================= */
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+}
+
+function makeGrouped3DExport(){
+  const root=new THREE.Group();
+  root.name='SIMPLE_CITY';
+
+  if(terrainMesh){
+    const t=terrainMesh.clone();
+    t.name='Terrain';
+    root.add(t);
+  }
+
+  if(buildingsGroup){
+    const b=new THREE.Group();
+    b.name='Gebäude';
+    buildingsGroup.children.forEach(o=>b.add(o.clone()));
+    root.add(b);
+  }
+
+  if(details3dGroup){
+    // details3dGroup ist bereits in benannte Kategorie-Untergruppen gegliedert
+    // (siehe DETAIL3D_GROUP_LABELS / build3DDetails) — hier nur klonen und
+    // dabei immer sichtbar exportieren, unabhängig vom aktuellen Anzeige-Toggle.
+    details3dGroup.children.forEach(sub=>{
+      if(!sub.children.length) return;
+      const clone=sub.clone();
+      clone.visible=true;
+      root.add(clone);
+    });
+  }
+  return root;
+}
+
+document.getElementById('expGlb').addEventListener('click', ()=>{
+  if(!state.built) return;
+  const exportGroup=makeGrouped3DExport();
+  const exporter=new THREE.GLTFExporter();
+  exporter.parse(exportGroup,(result)=>{
+    const blob=new Blob([result],{type:'model/gltf-binary'});
+    downloadBlob(blob,'simple-city-3d-v15.glb');
+  },{binary:true});
+});
+
+document.getElementById('expObj').addEventListener('click', ()=>{
+  if(!state.built) return;
+  const exporter=new THREE.OBJExporter();
+  const result=exporter.parse(makeGrouped3DExport());
+  const blob=new Blob([result],{type:'text/plain'});
+  downloadBlob(blob,'simple-city-3d-v15.obj');
+});
+
+document.getElementById('expSvg').addEventListener('click', ()=>{
+  if(!state.built || !lastSvgString) return;
+  // Wichtig: exakt dieselbe SVG wie in der SVG-Ansicht speichern.
+  const blob = new Blob([lastSvgString], {type:'image/svg+xml;charset=utf-8'});
+  downloadBlob(blob, 'simple-city.svg');
+});
+
+document.getElementById('expPng').addEventListener('click', async ()=>{
+  if(!state.built || !lastSvgString) return;
+  try{
+    const canvas = await svgStringToCanvas(lastSvgString, 2048);
+    canvas.toBlob(blob=>{ if(blob) downloadBlob(blob, 'simple-city.png'); }, 'image/png');
+  } catch(err){
+    setStatus('PNG-Export fehlgeschlagen: '+err.message, 'err');
+  }
+});
+
+})();
+</script>
+</body>
+</html>
